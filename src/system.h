@@ -12,9 +12,11 @@
 	#include "windef.h"
 #elif defined __linux__
 	#include <sys/types.h>
-	#define uint8_t 	u_int8_t
-	#define uint16_t  	u_int16_t
-	#define uint32_t 	u_int32_t
+	typedef u_int8_t	uint8_t;
+	typedef u_int16_t	uint16_t;
+	typedef u_int32_t	uint32_t;
+
+	typedef enum _bool{FALSE = 0, TRUE} bool;
 #else
 
 #endif

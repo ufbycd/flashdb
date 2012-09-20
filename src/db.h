@@ -11,6 +11,11 @@
 #include "system.h"
 #include <time.h>
 
+typedef enum _Db_err{
+	DB_OK  = 1,
+	DB_ERR = 0,
+}Db_err;
+
 typedef uint32_t Db_addr;
 
 typedef struct _Db_time{
@@ -33,11 +38,11 @@ typedef struct _Db_Info {
 	Db_child	child;
 }Db_Info;
 
-typedef struct _Db_Data{
-	Db_Info		info;
-	void 		*pdata;
-	size_t		data_len;
-}Db_Data;
+//typedef struct _Db_Data{
+//	Db_Info		info;
+//	void 		*pdata;
+//	size_t		data_len;
+//}Db_Data;
 
 typedef struct _queue {
 	Db_addr startAddr;
@@ -77,16 +82,14 @@ typedef struct
 	int			max_num;
 	Queue	 	*pque;
 	Queue		*pchildQue;
-} Que_ctrl;
+} Ctrl;
 
 #define O_RDONLY	     00
 #define O_WRONLY	     01
 #define O_RDWR		     02
 
-#define EOF				-1
-
 void db_init(void);
-int db_write(int type1, int type2, void *pdata, Db_time *ptime, size_t len);
-int db_read(int type1, int type2, void *pdata, size_t len, int dire);
+int db_write(Ctrl *pctrl, void *pdata, Db_time *ptime, size_t len);
+int db_read(Ctrl *pctrl, void *pdata, size_t len, int dire);
 
 #endif /* DB_H_ */

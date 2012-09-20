@@ -10,10 +10,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "db.h"
 
 int main(int argc, char **argv)
 {
 	puts("!!!Hello ARM World!!!"); /* prints !!!Hello ARM World!!! */
+
+	db_init();
 
 
 	return EXIT_SUCCESS;

@@ -113,7 +113,7 @@ static Db_addr _get_next_addr(Ctrl *pctrl, int dirt)
  * @todo	验证写入的正确性
  * @todo	处理坏块
  */
-Db_err db_write(Ctrl *pctrl, void *pdata, Db_time *ptime, size_t len)
+int db_write(Ctrl *pctrl, void *pdata, Db_time *ptime, size_t len)
 {
 	Queue *pque;
 	Db_Info info;

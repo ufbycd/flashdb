@@ -3,7 +3,7 @@
  *     Copyright (c)
  *     All rights reserved.
  *
- * @file	I2CEEProm.c
+ * @file	x86flash.c
  * @brief	
  *
  * 
@@ -14,8 +14,10 @@
  *
 ************************************************************************/
 
-#include "system.h"
-#include "flash.h"
+#ifdef _X86_
+
+#include "../../system.h"
+#include "../../flash.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -196,3 +198,4 @@ bool flash_read(uint32_t addr, void *buf, uint32_t len)
 	return TRUE;
 }
 
+#endif /* _X86_ */

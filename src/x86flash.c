@@ -1,6 +1,6 @@
 /************************************************************************
  *     COPYRIGHT NOTICE
- *     Copyright (c) 2011, ������̩��ʢʵҵ���޹�˾	����Ȩ������
+ *     Copyright (c)
  *     All rights reserved.
  *
  * @file	I2CEEProm.c
@@ -120,14 +120,14 @@ bool EEPromTest(void)
 }
 #endif
 /*****************************************************************
- * @berif	дһϵ�����
+ * @berif	写一系锟斤拷锟斤拷锟�
  *
  *
  *
- * @param	addr �ֽڵ�ַ
- * @param	buf		 ��ݻ���
- * @param	len		 ��д����ݵĳ���
- * @return	����ȷ����TRUE�����򷵻�FALSE
+ * @param	addr 锟街节碉拷址
+ * @param	buf		 锟斤拷莼锟斤拷锟�
+ * @param	len		 锟斤拷写锟斤拷锟斤拷莸某锟斤拷锟�
+ * @return	锟斤拷锟斤拷确锟斤拷锟斤拷TRUE锟斤拷锟斤拷锟津返伙拷FALSE
  ******************************************************************/
 bool flash_write(uint32_t addr, void * const buf, uint32_t len)
 {
@@ -158,14 +158,14 @@ bool flash_write(uint32_t addr, void * const buf, uint32_t len)
 	return TRUE;
 }
 /*****************************************************************
- * @berif	��ȡһϵ����ݵ�
+ * @berif	锟斤拷取一系锟斤拷锟斤拷莸锟�
  *
  *
  *
- * @param	addr �ֽڵ�ַ
- * @param	buf		 ��ݻ���
- * @param	len		 ���ȡ��ݵĳ���
- * @return	����ȷ����TRUE�����򷵻�FALSE
+ * @param	addr 锟街节碉拷址
+ * @param	buf		 锟斤拷莼锟斤拷锟�
+ * @param	len		 锟斤拷锟饺★拷锟捷的筹拷锟斤拷
+ * @return	锟斤拷锟斤拷确锟斤拷锟斤拷TRUE锟斤拷锟斤拷锟津返伙拷FALSE
  ******************************************************************/
 bool flash_read(uint32_t addr, void *buf, uint32_t len)
 {

@@ -38,11 +38,6 @@ typedef struct _Db_Info {
 	Db_child	child;
 }Db_Info;
 
-//typedef struct _Db_Data{
-//	Db_Info		info;
-//	void 		*pdata;
-//	size_t		data_len;
-//}Db_Data;
 
 typedef struct _queue {
 	Db_addr startAddr;
@@ -51,7 +46,7 @@ typedef struct _queue {
 	Db_addr readAddr;
 	size_t	 data_len;
 	int		flags;
-	void	*pctrl;
+	const void	*pctrl;
 //	struct {
 //		unsigned LOCK:1;
 //		unsigned FULL:1;
@@ -79,8 +74,7 @@ typedef enum _type2{
 } type2_t;
 
 /* 数据库控制块 */
-typedef struct
-{
+typedef const struct _Ctrl{
 	type1_t		type1;
 	type2_t		type2;
 	type2_t		child_type2;
@@ -88,6 +82,8 @@ typedef struct
 	int			max_num;
 	Queue	 	*pque;
 } Ctrl;
+
+//typedef const struct _Ctrl Ctrl;
 
 #define O_RDONLY	     00
 #define O_WRONLY	     01

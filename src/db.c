@@ -27,7 +27,7 @@ typedef struct _Test_Data
 
 static Queue ques[7];
 
-static const Ctrl ctrls[] = {
+static Ctrl ctrls[] = {
 		{ TEST, SEC,	NONE1,	sizeof(Test_data), 120, &ques[0]},
 		{ TEST, MIN, 	SEC,	sizeof(Test_data), 120, &ques[1]},
 		{ TEST, HOUR, 	MIN,	sizeof(Test_data), 48, &ques[2]},
@@ -90,7 +90,7 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 		}
 		else if(ctrls[i].type2 == type2)
 		{
-			pctrl = (Ctrl *)&ctrls[i];
+			pctrl = &ctrls[i];
 		}
 	}
 
@@ -123,6 +123,8 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	else if(flags == O_WRONLY)
 	{
 		pque = pctrl->pque;
+		pque->flags = flags;
+		pque->pctrl = pctrl;
 	}
 
 	return pque;
@@ -130,10 +132,14 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 
 int db_close(Queue *pque)
 {
-
 	if(pque->flags == O_RDONLY)
 	{
 		assert(pque != NULL);
+
+		/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
+		Ctrl *pctrl = pque->pctrl;
+		pctrl->pque->readAddr = pque->readAddr;
+
 		free(pque);
 	}
 
@@ -255,16 +261,14 @@ int db_seek(Queue *pque, int sym)
 	return 0;
 }
 
-type2_t _get_child_type(Queue *pque)
+static type2_t _get_child_type(Queue *pque)
 {
-	Ctrl *pctrl;
-
-	pctrl = pque->pctrl;
+	Ctrl *pctrl = pque->pctrl;
 
 	return pctrl->child_type2;
 }
 
-bool db_time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
+static bool _time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
 {
 	return FALSE;
 }
@@ -292,7 +296,7 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 			if(_read_time(pque, &rtime) < 0)
 				break;
 
-			if(db_time_match(ptime, &rtime, locate_type2))
+			if(_time_match(ptime, &rtime, locate_type2))
 			{
 				match = TRUE;
 				break;

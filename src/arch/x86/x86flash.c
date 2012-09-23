@@ -50,10 +50,11 @@ static const char *x86flash = "flash.bin";
 void flash_init(void)
 {
 	FILE *fp;
-	uint8_t mbuf[flash.pageSize];
+	uint8_t page[flash.pageSize];
 	int pageCount = flash.totalSize / flash.pageSize;
+	int i;
 
-	memset(mbuf, 0xffffffff, sizeof(mbuf));
+	memset(page, 0xffffffff, sizeof(page));
 
 	fp = fopen(x86flash, "r+b");
 	if(fp == NULL)
@@ -67,11 +68,14 @@ void flash_init(void)
 			return;
 		}
 
-		if(fwrite(mbuf, pageCount, sizeof(mbuf), fp) != sizeof(mbuf) * pageCount)
+		for (i = 0; i < pageCount; ++i)
 		{
-			debug("Can not init file!\n");
-			fclose(fp);
-			return;
+			if(fwrite(page, 1, sizeof(page), fp) != sizeof(page))
+			{
+				debug("Init file error!\n");
+				fclose(fp);
+				return;
+			}
 		}
 	}
 

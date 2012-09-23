@@ -20,7 +20,9 @@
 	typedef u_int8_t	uint8_t;
 	typedef u_int16_t	uint16_t;
 	typedef u_int32_t	uint32_t;
-
+#	define FALSE 0
+#	define TRUE  1
+	typedef enum _bool{false = FALSE, true = TRUE} bool;
 #else
 
 #endif

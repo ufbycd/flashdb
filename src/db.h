@@ -49,6 +49,9 @@ typedef struct _queue {
 	Db_addr endAddr;
 	Db_addr writeAddr;
 	Db_addr readAddr;
+	size_t	 data_len;
+	int		flags;
+	void	*pctrl;
 //	struct {
 //		unsigned LOCK:1;
 //		unsigned FULL:1;
@@ -56,6 +59,7 @@ typedef struct _queue {
 } Queue;
 
 typedef enum _type1{
+	NONE1,
 	TEST,
 	ELEC,
 	GEN,
@@ -64,6 +68,7 @@ typedef enum _type1{
 }type1_t;
 
 typedef enum _type2{
+	NONE2,
 	SEC,
 	MIN,
 	HOUR,
@@ -78,18 +83,18 @@ typedef struct
 {
 	type1_t		type1;
 	type2_t		type2;
+	type2_t		child_type2;
 	size_t	 	data_len;
 	int			max_num;
 	Queue	 	*pque;
-	Queue		*pchildQue;
 } Ctrl;
 
 #define O_RDONLY	     00
 #define O_WRONLY	     01
-#define O_RDWR		     02
+//#define O_RDWR		     02
 
 void db_init(void);
-int db_write(Ctrl *pctrl, void *pdata, Db_time *ptime, size_t len);
-int db_read(Ctrl *pctrl, void *pdata, size_t len, int dire);
+int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len);
+int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len);
 
 #endif /* DB_H_ */

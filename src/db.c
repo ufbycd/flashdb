@@ -7,6 +7,8 @@
 
 #include "db.h"
 #include "flash.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define DATA_AVAIL 0xfe
 #define DATA_NAN   0xff
@@ -26,22 +28,21 @@ typedef struct _Test_Data
 static Queue ques[7];
 
 static const Ctrl ctrls[] = {
-		{ TEST, SEC, sizeof(Test_data), 120, &ques[0], NULL },
-		{ TEST, MIN, sizeof(Test_data), 120, &ques[1], &ques[0] },
-		{ TEST, HOUR, sizeof(Test_data), 48, &ques[2], &ques[1] },
-		{ TEST, DAY, sizeof(Test_data), 30, &ques[3], &ques[2] },
-		{ TEST, WEEK, sizeof(Test_data),	 7,	 &ques[4],	&ques[3]},
-		{ TEST, MONTH, sizeof(Test_data), 12, &ques[5], &ques[3] },
-		{ TEST, YEAR, sizeof(Test_data), 2, &ques[6], &ques[5] },
+		{ TEST, SEC,	NONE1,	sizeof(Test_data), 120, &ques[0]},
+		{ TEST, MIN, 	SEC,	sizeof(Test_data), 120, &ques[1]},
+		{ TEST, HOUR, 	MIN,	sizeof(Test_data), 48, &ques[2]},
+		{ TEST, DAY, 	HOUR,	sizeof(Test_data), 30, &ques[3]},
+		{ TEST, WEEK, 	DAY,	sizeof(Test_data), 7, 	&ques[4]},
+		{ TEST, MONTH, 	DAY,	sizeof(Test_data), 12, &ques[5]},
+		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), 2, 	&ques[6]},
 };
 
 #define DEBUG 1
 #if DEBUG
-	#define debug(fmt, args...) printf(fmt, ##args)
+#define debug(fmt, args...) printf(fmt, ##args)
 #else
-	#define debug(fmt, args...)
+#define debug(fmt, args...)
 #endif
-
 
 static inline void _init(void);
 static inline int _write(Db_addr addr, void *pdata, size_t len);
@@ -76,13 +77,66 @@ void db_init(void)
 //	return NULL ;
 //}
 
-Ctrl *db_open(type1_t type1, type2_t type2, int flags, ...)
+static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 {
-	return NULL;
+	int i;
+	Ctrl *pctrl = NULL;
+
+	for(i = 0; i < sizeof(ctrls) / sizeof(ctrls[0]); ++i)
+	{
+		if(ctrls[i].type1 != type1)
+		{
+			continue;
+		}
+		else if(ctrls[i].type2 == type2)
+		{
+			pctrl = (Ctrl *)&ctrls[i];
+		}
+	}
+
+	return pctrl ;
 }
 
-int db_close(Ctrl *pctrl)
+Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
+	Ctrl *pctrl;
+	Queue *pque = NULL;
+
+	pctrl = _get_ctrl(type1, type2);
+	if(pctrl == NULL)
+		return NULL;
+
+	assert(pctrl->pque != NULL);
+
+	if(flags == O_RDONLY)
+	{
+		pque = (Queue *)malloc(sizeof(Queue));
+		if(pque == NULL)
+		{
+			return NULL;
+		}
+
+		memcpy(pque, pctrl->pque, sizeof(Queue));
+		pque->flags = flags;
+		pque->pctrl = pctrl;
+	}
+	else if(flags == O_WRONLY)
+	{
+		pque = pctrl->pque;
+	}
+
+	return pque;
+}
+
+int db_close(Queue *pque)
+{
+
+	if(pque->flags == O_RDONLY)
+	{
+		assert(pque != NULL);
+		free(pque);
+	}
+
 	return 0;
 }
 
@@ -91,16 +145,34 @@ static uint8_t _calc_checksum(Db_Info *pinfo, void *pdata, size_t len)
 	return 0;
 }
 
-static Db_child _get_child(Ctrl *pctrl)
-{
-	Db_child child;
-
-	return child;
-}
-
-static Db_addr _get_next_addr(Ctrl *pctrl, int dirt)
+static Db_addr _get_next_addr(Queue *pque, int dirt)
 {
 	return 0;
+}
+
+static Db_child _get_child(Queue *pque)
+{
+	Db_child child;
+	Ctrl *pctrl;
+	Queue *pchild_que;
+
+	assert(pque != NULL);
+
+	pctrl = pque->pctrl;
+	if(pctrl->child_type2 != NONE2)
+	{
+		pchild_que = db_open(pctrl->type1, pctrl->child_type2, O_WRONLY);
+		assert(pchild_que != NULL);
+
+		child.startAddr = _get_next_addr(pchild_que, -1);
+		db_close(pchild_que);
+	}
+	else
+	{
+		child.startAddr = 0x00;
+	}
+
+	return child;
 }
 
 /**
@@ -113,26 +185,24 @@ static Db_addr _get_next_addr(Ctrl *pctrl, int dirt)
  * @todo	验证写入的正确性
  * @todo	处理坏块
  */
-int db_write(Ctrl *pctrl, void *pdata, Db_time *ptime, size_t len)
+int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 {
-	Queue *pque;
 	Db_Info info;
 
-	assert(pctrl != NULL);
+	assert(pque != NULL);
 	assert(pdata != NULL);
-	assert(len == pctrl->data_len);
-
-	pque = pctrl->pque;
+	assert(len == pque->data_len);
+	assert(pque->flags == O_WRONLY);
 
 	info.flag = DATA_AVAIL;
 	info.time = *ptime;
-	info.child = _get_child(pctrl);
+	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(&info, pdata, len);
 
 	_write(pque->writeAddr, &info, sizeof(info));
-	_write(pque->writeAddr +  sizeof(info), pdata, len);
+	_write(pque->writeAddr + sizeof(info), pdata, len);
 
-	pque->writeAddr = _get_next_addr(pctrl, 1);
+	pque->writeAddr = _get_next_addr(pque, 1);
 
 	return DB_OK;
 }
@@ -146,17 +216,15 @@ int db_write(Ctrl *pctrl, void *pdata, Db_time *ptime, size_t len)
  * @return
  * @todo	处理坏块
  */
-int db_read(Ctrl *pctrl, void *pdata, size_t len, int dirt)
+int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 {
-	Queue *pque;
 	Db_Info info;
 	bool stat;
 
-	assert(pctrl != NULL);
+	assert(pque != NULL);
 	assert(pdata != NULL);
-	assert(len == pctrl->data_len);
-
-	pque = pctrl->pque;
+	assert(len == pque->data_len);
+	assert(pque->flags == O_RDONLY);
 
 	stat = _read(pque->readAddr, &info, sizeof(info));
 	if(info.flag != DATA_AVAIL)
@@ -166,26 +234,34 @@ int db_read(Ctrl *pctrl, void *pdata, size_t len, int dirt)
 	if(info.checksum != _calc_checksum(&info, pdata, len))
 		return DB_ERR;
 
-	pque->readAddr = _get_next_addr(pctrl, dirt);
+	if(ptime != NULL)
+	{
+		memcpy(ptime, &info.time, sizeof(Db_time));
+	}
+//	pque->readAddr = _get_next_addr(pque, -1);
 
 	return DB_OK;
 }
 
-static int db_read_time(Ctrl *pctrl, Db_time *ptime)
+static int _read_time(Queue *pque, Db_time *ptime)
 {
 
 	return 0;
 }
 
-int db_seek(Ctrl *pctrl, int sym)
+int db_seek(Queue *pque, int sym)
 {
 
 	return 0;
 }
 
-type2_t get_child_type(Ctrl *pctrl)
+type2_t _get_child_type(Queue *pque)
 {
-	return 0;
+	Ctrl *pctrl;
+
+	pctrl = pque->pctrl;
+
+	return pctrl->child_type2;
 }
 
 bool db_time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
@@ -193,9 +269,9 @@ bool db_time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
 	return FALSE;
 }
 
-Ctrl * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
+Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 {
-	Ctrl *pctrl;
+	Queue *pque;
 	type2_t locate_type2, next_type2;
 	Db_time rtime;
 	bool match;
@@ -206,14 +282,14 @@ Ctrl * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 	do
 	{
 		locate_type2 = next_type2;
-		pctrl = db_open(type1, locate_type2, O_RDONLY);
-		if(pctrl == NULL)
-			return NULL;
+		pque = db_open(type1, locate_type2, O_RDONLY);
+		if(pque == NULL )
+			return NULL ;
 
 		match = FALSE;
 		while(1)
 		{
-			if(db_read_time(pctrl, &rtime) < 0)
+			if(_read_time(pque, &rtime) < 0)
 				break;
 
 			if(db_time_match(ptime, &rtime, locate_type2))
@@ -222,28 +298,28 @@ Ctrl * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 				break;
 			}
 
-			if(db_seek(pctrl, -1) == EOF)
+			if(db_seek(pque, -1) == EOF)
 				break;
 		}
 
 		if(match && locate_type2 == type2)
 		{
-			return pctrl;
+			return pque;
 		}
 		else if(match)
 		{
-			next_type2 = get_child_type(pctrl);
-			db_close(pctrl);
+			next_type2 = _get_child_type(pque);
+			db_close(pque);
 		}
 		else
 		{
-			db_close(pctrl);
-			return NULL;
+			db_close(pque);
+			return NULL ;
 		}
 
 	} while(locate_type2 != type2);
 
-	return NULL;
+	return NULL ;
 }
 
 static int db_malloc()

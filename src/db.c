@@ -1,8 +1,9 @@
-/*
+/**
  * db.c
  *
  *  Created on: 2012-9-8
  *      Author: chenss
+ *      @todo 引入单元测试框架
  */
 
 #include "db.h"

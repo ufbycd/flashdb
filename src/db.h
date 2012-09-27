@@ -69,5 +69,6 @@ typedef enum _type2{
 void db_init(void);
 int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len);
 int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len);
+int db_append(Queue *pque, void *pdata, Db_time *ptime, size_t len);
 
 #endif /* DB_H_ */

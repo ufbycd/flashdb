@@ -16,8 +16,6 @@ typedef enum _Db_err{
 	DB_ERR = 0,
 }Db_err;
 
-typedef uint32_t Db_addr;
-
 typedef struct _Db_time{
 	uint8_t		sec;
 	uint8_t		min;
@@ -27,22 +25,8 @@ typedef struct _Db_time{
 	uint8_t		year;
 }Db_time;
 
-typedef struct _Db_child {
-	Db_addr		startAddr;
-}Db_child;
 
-typedef struct _Db_Info {
-	uint8_t		flag;
-	uint8_t		checksum;
-	Db_time		time;
-	Db_child	child;
-}Db_Info;
-
-//typedef struct _Db_Data{
-//	Db_Info		info;
-//	void 		*pdata;
-//	size_t		data_len;
-//}Db_Data;
+typedef uint32_t Db_addr;
 
 typedef struct _queue {
 	Db_addr startAddr;
@@ -56,7 +40,7 @@ typedef struct _queue {
 //		unsigned LOCK:1;
 //		unsigned FULL:1;
 //	};
-} Queue;
+}Queue;
 
 typedef enum _type1{
 	NONE1,
@@ -77,17 +61,6 @@ typedef enum _type2{
 	MONTH,
 	YEAR,
 } type2_t;
-
-/* 数据库控制块 */
-typedef struct
-{
-	type1_t		type1;
-	type2_t		type2;
-	type2_t		child_type2;
-	size_t	 	data_len;
-	int			max_num;
-	Queue	 	*pque;
-} Ctrl;
 
 #define O_RDONLY	     00
 #define O_WRONLY	     01

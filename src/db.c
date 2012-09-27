@@ -21,6 +21,28 @@ static const struct
 	Db_addr earseSize;
 } db = { 0x0100, 0xff00, EARSE_SIZE };
 
+typedef struct _Db_child {
+	Db_addr		startAddr;
+}Db_child;
+
+typedef struct _Db_Info {
+	uint8_t		flag;
+	uint8_t		checksum;
+	Db_time		time;
+	Db_child	child;
+}Db_Info;
+
+/* 数据库控制块 */
+typedef struct
+{
+	type1_t		type1;
+	type2_t		type2;
+	type2_t		child_type2;
+	size_t	 	data_len;
+	int			max_num;
+	Queue	 	*pque;
+} Ctrl;
+
 typedef struct _Test_Data
 {
 	uint32_t val;
@@ -48,13 +70,14 @@ static const Ctrl ctrls[] = {
 static inline void _init(void);
 static inline int _write(Db_addr addr, void *pdata, size_t len);
 static inline int _read(Db_addr addr, void *pdata, size_t len);
-static int db_malloc(void);
+static int _malloc(void);
+static int _fill_heads(void);
 
 void db_init(void)
 {
 	_init();
 
-	if(db_malloc() == -1)
+	if(_malloc() == -1)
 	{
 //		debug
 	}
@@ -323,12 +346,21 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 	return NULL ;
 }
 
-static int db_malloc()
+static int _malloc()
 {
 
 	return 0;
 }
 
+static Db_addr _find_queue_head(Queue *pque)
+{
+	return 0;
+}
+
+static int _fill_heads(void)
+{
+	return 0;
+}
 static inline void _init(void)
 {
 	flash_init();

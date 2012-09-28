@@ -67,8 +67,15 @@ typedef enum _type2{
 //#define O_RDWR		     02
 
 void db_init(void);
+Queue *db_open(type1_t type1, type2_t type2, int flags, ...);
+int db_close(Queue *pque);
+
+int db_seek(Queue *pque, int sym);
+Queue *db_locate(type1_t type1, type2_t type2, Db_time *ptime);
+
 int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len);
 int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len);
 int db_append(Queue *pque, void *pdata, Db_time *ptime, size_t len);
+
 
 #endif /* DB_H_ */

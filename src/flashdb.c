@@ -14,7 +14,7 @@
 
 int main(int argc, char **argv)
 {
-	puts("!!!Hello ARM World!!!"); /* prints !!!Hello ARM World!!! */
+	puts("!!!Hello World!!!"); /* prints !!!Hello ARM World!!! */
 
 	db_init();
 

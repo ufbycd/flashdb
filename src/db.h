@@ -62,9 +62,10 @@ typedef enum _type2{
 } type2_t;
 
 
-#define O_RDONLY	     00
-#define O_WRONLY	     01
-//#define O_RDWR		 02
+#define O_NOACCESS		00
+#define O_RDONLY	    01
+#define O_WRONLY	    02
+//#define O_RDWR		03
 
 void db_init(void);
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...);

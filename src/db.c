@@ -11,6 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/// 是否支持对同一队列同时有多个read open
+#define MULTIPLE_READ 0
+
 #define DATA_AVAIL 0xfe
 #define DATA_NAN   0xff
 
@@ -42,25 +45,24 @@ typedef const struct
 	type2_t child_type2;
 	size_t data_len;
 	int max_num;
-	Queue *pque;
+//	Queue *pque;
+	int		que_index;
 } Ctrl;
 
 typedef struct _Test_Data
 {
-	uint32_t val;
+	uint32_t val[4];
 } Test_data;
 
-static Queue ques[7];
-
 static Ctrl ctrls[] = {
-		{ TEST, SEC,	NONE1,	sizeof(Test_data), 120, &ques[0]},
-		{ TEST, MIN, 	SEC,	sizeof(Test_data), 120, &ques[1]},
-		{ TEST, HOUR, 	MIN,	sizeof(Test_data), 48, &ques[2]},
-		{ TEST, DAY, 	HOUR,	sizeof(Test_data), 30, &ques[3]},
-		{ TEST, WEEK, 	DAY,	sizeof(Test_data), 7, 	&ques[4]},
-		{ TEST, MONTH, 	DAY,	sizeof(Test_data), 12, &ques[5]},
-		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), 2, 	&ques[6]},
+		{ TEST, MIN, 	NONE1,	sizeof(Test_data), 2500, 0},
+		{ TEST, DAY, 	MIN,	sizeof(Test_data), 48,	1},
+		{ TEST, WEEK, 	DAY,	sizeof(Test_data), 7,	2},
+		{ TEST, MONTH, 	DAY,	sizeof(Test_data), 14,	3},
+		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), 2,	4},
 };
+
+static Queue ques[ARRAY_LENG(ctrls)];
 
 #define DEBUG 1
 #if DEBUG
@@ -78,16 +80,22 @@ static size_t _size_of_info(Queue *pque);
 
 void db_init(void)
 {
-	_init();
+	Db_addr all, used;
+	float use_pec;
 
+	_init();
 	_malloc();
-//	_fill_heads();
+	_fill_heads();
+
+	all = db.endAddr - db.startAddr;
+	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr;
+	use_pec = 100 * (float)used / (float)all;
 
 	debug("db info:\n");
 	debug("startAddr = %#08x\n", db.startAddr);
 	debug("endAddr   = %#08x\n", db.endAddr);
 	debug("earseSize = %#08x\n", db.earseSize);
-	debug("used: %%u / %%u = %%.2f\n");
+	debug("used: %#08x / %#08x = %.2f%%\n", used, all, use_pec);
 }
 
 static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
@@ -110,6 +118,27 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 	return pctrl;
 }
 
+static Queue *_get_que(Ctrl *pctrl)
+{
+	assert(pctrl != NULL);
+
+#if 0
+	int i;
+
+	for(i = 0; i < ARRAY_LENG(ctrls); i++)
+	{
+		if(pctrl == &ctrls[i])
+		{
+			return &ques[i];
+		}
+	}
+	return NULL;
+#else
+	return &ques[pctrl->que_index];
+#endif
+
+}
+
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
 	Ctrl *pctrl;
@@ -119,8 +148,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	if(pctrl == NULL )
 		return NULL ;
 
-	assert(pctrl->pque != NULL);
-
+#if MULTIPLE_READ
 	if(flags == O_RDONLY)
 	{
 		pque = (Queue *)malloc(sizeof(Queue));
@@ -129,32 +157,45 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 			return NULL ;
 		}
 
-		memcpy(pque, pctrl->pque, sizeof(Queue));
+		memcpy(pque, _get_que(pctrl), sizeof(Queue));
 		pque->flags = flags;
 		pque->pctrl = pctrl;
 	}
 	else if(flags == O_WRONLY)
 	{
-		pque = pctrl->pque;
+		pque = _get_que(pctrl);
 		pque->flags = flags;
 		pque->pctrl = pctrl;
 	}
+#else
+	pque = _get_que(pctrl);
+	pque->flags = flags;
+	pque->pctrl = pctrl;
+#endif
 
 	return pque;
 }
 
 bool db_close(Queue *pque)
 {
+
+	assert(pque != NULL);
+
+#if MULTIPLE_READ
 	if(pque->flags == O_RDONLY)
 	{
-		assert(pque != NULL);
-
 		/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
-		Ctrl *pctrl = pque->pctrl;
-		pctrl->pque->readAddr = pque->readAddr;
+		Queue *pmain_que = _get_que(pque->pctrl);
+		pmain_que->readAddr = pque->readAddr;
+		pmain_que->flags = O_NOACCESS;
 
 		free(pque);
+
+		return true;
 	}
+#endif
+
+	pque->flags = O_NOACCESS;
 
 	return true;
 }
@@ -316,7 +357,7 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 	bool match;
 
 //	pctrl = get_ctrl_by_type(type1, YEAR);
-//	pque = pctrl->pque;
+//	pque = _get_que(pctrl);
 	next_type2 = YEAR;
 	do
 	{
@@ -373,12 +414,17 @@ static bool _malloc(void)
 	addr = db.startAddr;
 	for(i = 0; i < ARRAY_LENG(ctrls); i++)
 	{
-		pque = ctrls[i].pque;
+		pque = &ques[i];
+		pque->pctrl = &ctrls[i];
 
 		pque->startAddr = addr;
 		datas_len = (_size_of_info(pque) + ctrls[i].data_len) * ctrls[i].max_num;
 		que_len = ( 2 + datas_len / db.earseSize) * db.earseSize;
 		pque->endAddr = pque->startAddr + que_len;
+
+		pque->readAddr = 0x00;
+		pque->writeAddr = 0x00;
+		pque->flags = O_NOACCESS;
 
 		if(pque->endAddr > db.endAddr)
 		{
@@ -417,7 +463,6 @@ static inline void _init(void)
  * @param pdata
  * @param len
  * @return
- * @todo	匹配返回值原型
  */
 static inline bool _write(Db_addr addr, void *pdata, size_t len)
 {
@@ -430,7 +475,6 @@ static inline bool _write(Db_addr addr, void *pdata, size_t len)
  * @param pdata
  * @param len
  * @return
- * @todo	匹配返回值原型
  */
 static inline bool _read(Db_addr addr, void *pdata, size_t len)
 {

@@ -70,25 +70,18 @@ static Ctrl ctrls[] = {
 #endif
 
 static inline void _init(void);
-static inline int _write(Db_addr addr, void *pdata, size_t len);
-static inline int _read(Db_addr addr, void *pdata, size_t len);
-static int _malloc(void);
-static int _fill_heads(void);
+static inline bool _write(Db_addr addr, void *pdata, size_t len);
+static inline bool _read(Db_addr addr, void *pdata, size_t len);
+static bool _malloc(void);
+static bool _fill_heads(void);
 static size_t _size_of_info(Queue *pque);
 
 void db_init(void)
 {
 	_init();
 
-	if(_malloc() == -1)
-	{
-//		debug
-	}
-
-	if(_fill_heads() < 0)
-	{
-		debug("Fill Heads Error!\n");
-	}
+	_malloc();
+//	_fill_heads();
 
 	debug("db info:\n");
 	debug("startAddr = %#08x\n", db.startAddr);
@@ -96,18 +89,6 @@ void db_init(void)
 	debug("earseSize = %#08x\n", db.earseSize);
 	debug("used: %%u / %%u = %%.2f\n");
 }
-
-//static Que_ctrl *get_ctrl_by_type(type1_t type1, type2_t type2)
-//{
-//
-//	return NULL ;
-//}
-//
-//static Que_ctrl *get_ctrl_by_queue(Queue *pque)
-//{
-//
-//	return NULL ;
-//}
 
 static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 {
@@ -162,7 +143,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	return pque;
 }
 
-int db_close(Queue *pque)
+bool db_close(Queue *pque)
 {
 	if(pque->flags == O_RDONLY)
 	{
@@ -175,7 +156,7 @@ int db_close(Queue *pque)
 		free(pque);
 	}
 
-	return 0;
+	return true;
 }
 
 static bool _have_child(Queue *pque)
@@ -245,7 +226,7 @@ static Db_child _get_child(Queue *pque)
  * @todo	验证写入的正确性
  * @todo	处理坏块
  */
-int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
+bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 {
 	Db_Info info;
 
@@ -264,7 +245,7 @@ int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 
 	pque->writeAddr = _get_next_addr(pque, 1);
 
-	return DB_OK;
+	return true;
 }
 
 /**
@@ -276,7 +257,7 @@ int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
  * @return
  * @todo	处理坏块
  */
-int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
+bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 {
 	Db_Info info;
 	bool stat;
@@ -288,11 +269,11 @@ int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 
 	stat = _read(pque->readAddr, &info, _size_of_info(pque));
 	if(info.flag != DATA_AVAIL)
-		return DB_ERR;
+		return false;
 
 	stat &= _read(pque->readAddr + _size_of_info(pque), pdata, len);
 	if(info.checksum != _calc_checksum(pque, &info, pdata, len))
-		return DB_ERR;
+		return false;
 
 	if(ptime != NULL )
 	{
@@ -300,16 +281,16 @@ int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 	}
 //	pque->readAddr = _get_next_addr(pque, -1);
 
-	return DB_OK;
+	return true;
 }
 
-static int _read_time(Queue *pque, Db_time *ptime)
+static bool _read_time(Queue *pque, Db_time *ptime)
 {
 
-	return 0;
+	return false;
 }
 
-int db_seek(Queue *pque, int sym)
+bool db_seek(Queue *pque, int sym)
 {
 
 	return 0;
@@ -324,7 +305,7 @@ static type2_t _get_child_type(Queue *pque)
 
 static bool _time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
 {
-	return FALSE;
+	return false;
 }
 
 Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
@@ -380,10 +361,35 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 	return NULL ;
 }
 
-static int _malloc(void)
+static bool _malloc(void)
 {
+	Db_addr addr;
+	Queue *pque;
+	size_t datas_len;	// 所有 info信息 + 待存储数据 长度之和
+	size_t que_len;			// 队列所需的长度
+	int i;
+	bool stat = true;
 
-	return 0;
+	addr = db.startAddr;
+	for(i = 0; i < ARRAY_LENG(ctrls); i++)
+	{
+		pque = ctrls[i].pque;
+
+		pque->startAddr = addr;
+		datas_len = (_size_of_info(pque) + ctrls[i].data_len) * ctrls[i].max_num;
+		que_len = ( 2 + datas_len / db.earseSize) * db.earseSize;
+		pque->endAddr = pque->startAddr + que_len;
+
+		if(pque->endAddr > db.endAddr)
+		{
+			debug("DB Error: Out of range!\n");
+			stat = true;
+		}
+
+		addr = pque->endAddr + 1;
+	}
+
+	return stat;
 }
 
 static Db_addr _find_queue_head(Queue *pque)
@@ -391,13 +397,13 @@ static Db_addr _find_queue_head(Queue *pque)
 	return 0;
 }
 
-static int _fill_heads(void)
+static bool _fill_heads(void)
 {
 	Queue *pque = NULL;
 
 	_find_queue_head(pque);
 
-	return 0;
+	return false;
 }
 
 static inline void _init(void)
@@ -413,7 +419,7 @@ static inline void _init(void)
  * @return
  * @todo	匹配返回值原型
  */
-static inline int _write(Db_addr addr, void *pdata, size_t len)
+static inline bool _write(Db_addr addr, void *pdata, size_t len)
 {
 	return flash_write(addr, pdata, len);
 }
@@ -426,7 +432,7 @@ static inline int _write(Db_addr addr, void *pdata, size_t len)
  * @return
  * @todo	匹配返回值原型
  */
-static inline int _read(Db_addr addr, void *pdata, size_t len)
+static inline bool _read(Db_addr addr, void *pdata, size_t len)
 {
 	return flash_read(addr, pdata, len);
 }

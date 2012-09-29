@@ -17,12 +17,12 @@ typedef enum _Db_err{
 }Db_err;
 
 typedef struct _Db_time{
-	uint8_t		sec;
-	uint8_t		min;
-	uint8_t		hour;
-	uint8_t		day;
-	uint8_t		month;
-	uint8_t		year;
+	int8_t		min;
+	int8_t		hour;
+	int8_t		day;
+	int8_t		weeks;
+	int8_t		month;
+	int8_t		year;
 }Db_time;
 
 

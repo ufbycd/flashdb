@@ -19,28 +19,30 @@ static const struct
 	Db_addr startAddr;
 	Db_addr endAddr;
 	Db_addr earseSize;
-} db = { 0x0100, 0xff00, EARSE_SIZE };
+} db = {0x0100, 0xff00, EARSE_SIZE};
 
-typedef struct _Db_child {
-	Db_addr		startAddr;
-}Db_child;
+typedef struct _Db_child
+{
+	Db_addr startAddr;
+} Db_child;
 
-typedef struct _Db_Info {
-	uint8_t		flag;
-	uint8_t		checksum;
-	Db_time		time;
-	Db_child	child;
-}Db_Info;
+typedef struct _Db_Info
+{
+	uint8_t flag;
+	uint8_t checksum;
+	Db_time time;
+	Db_child child;
+} Db_Info;
 
 /* 数据库控制块 */
 typedef struct
 {
-	type1_t		type1;
-	type2_t		type2;
-	type2_t		child_type2;
-	size_t	 	data_len;
-	int			max_num;
-	Queue	 	*pque;
+	type1_t type1;
+	type2_t type2;
+	type2_t child_type2;
+	size_t data_len;
+	int max_num;
+	Queue *pque;
 } Ctrl;
 
 typedef struct _Test_Data
@@ -50,15 +52,11 @@ typedef struct _Test_Data
 
 static Queue ques[7];
 
-static const Ctrl ctrls[] = {
-		{ TEST, SEC,	NONE1,	sizeof(Test_data), 120, &ques[0]},
-		{ TEST, MIN, 	SEC,	sizeof(Test_data), 120, &ques[1]},
-		{ TEST, HOUR, 	MIN,	sizeof(Test_data), 48, &ques[2]},
-		{ TEST, DAY, 	HOUR,	sizeof(Test_data), 30, &ques[3]},
-		{ TEST, WEEK, 	DAY,	sizeof(Test_data), 7, 	&ques[4]},
-		{ TEST, MONTH, 	DAY,	sizeof(Test_data), 12, &ques[5]},
-		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), 2, 	&ques[6]},
-};
+static const Ctrl ctrls[] = {{TEST, SEC, NONE1, sizeof(Test_data), 120, &ques[0]}, {TEST, MIN, SEC,
+        sizeof(Test_data), 120, &ques[1]}, {TEST, HOUR, MIN, sizeof(Test_data), 48, &ques[2]}, {
+        TEST, DAY, HOUR, sizeof(Test_data), 30, &ques[3]}, {TEST, WEEK, DAY, sizeof(Test_data), 7,
+        &ques[4]}, {TEST, MONTH, DAY, sizeof(Test_data), 12, &ques[5]}, {TEST, YEAR, MONTH,
+        sizeof(Test_data), 2, &ques[6]}, };
 
 #define DEBUG 1
 #if DEBUG
@@ -72,6 +70,7 @@ static inline int _write(Db_addr addr, void *pdata, size_t len);
 static inline int _read(Db_addr addr, void *pdata, size_t len);
 static int _malloc(void);
 static int _fill_heads(void);
+static size_t _size_of_info(Queue *pque);
 
 void db_init(void)
 {
@@ -118,7 +117,7 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 		}
 	}
 
-	return pctrl ;
+	return pctrl;
 }
 
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
@@ -127,17 +126,17 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	Queue *pque = NULL;
 
 	pctrl = _get_ctrl(type1, type2);
-	if(pctrl == NULL)
-		return NULL;
+	if(pctrl == NULL )
+		return NULL ;
 
 	assert(pctrl->pque != NULL);
 
 	if(flags == O_RDONLY)
 	{
 		pque = (Queue *)malloc(sizeof(Queue));
-		if(pque == NULL)
+		if(pque == NULL )
 		{
-			return NULL;
+			return NULL ;
 		}
 
 		memcpy(pque, pctrl->pque, sizeof(Queue));
@@ -164,7 +163,29 @@ int db_close(Queue *pque)
 	return 0;
 }
 
-static uint8_t _calc_checksum(Db_Info *pinfo, void *pdata, size_t len)
+static bool _have_child(Queue *pque)
+{
+	Ctrl *pctrl;
+
+	pctrl = pque->pctrl;
+	if(pctrl->child_type2 == NONE2)
+		return false;
+
+	return true;
+}
+
+static size_t _size_of_info(Queue *pque)
+{
+	Db_Info info;
+
+	if(_have_child(pque))
+		return sizeof(info);
+	else
+		return sizeof(info.flag) + sizeof(info.checksum) + sizeof(info.time.min)
+		        + sizeof(info.time.hour);
+}
+
+static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t data_len)
 {
 	return 0;
 }
@@ -223,8 +244,8 @@ int db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(&info, pdata, len);
 
-	_write(pque->writeAddr, &info, sizeof(info));
-	_write(pque->writeAddr + sizeof(info), pdata, len);
+	_write(pque->writeAddr, &info, _size_of_info(pque));
+	_write(pque->writeAddr + _size_of_info(pque), pdata, len);
 
 	pque->writeAddr = _get_next_addr(pque, 1);
 
@@ -250,15 +271,15 @@ int db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 	assert(len == pque->data_len);
 	assert(pque->flags == O_RDONLY);
 
-	stat = _read(pque->readAddr, &info, sizeof(info));
+	stat = _read(pque->readAddr, &info, _size_of_info(pque));
 	if(info.flag != DATA_AVAIL)
 		return DB_ERR;
 
-	stat &= _read(pque->readAddr + sizeof(info), pdata, len);
+	stat &= _read(pque->readAddr + _size_of_info(pque), pdata, len);
 	if(info.checksum != _calc_checksum(&info, pdata, len))
 		return DB_ERR;
 
-	if(ptime != NULL)
+	if(ptime != NULL )
 	{
 		memcpy(ptime, &info.time, sizeof(Db_time));
 	}

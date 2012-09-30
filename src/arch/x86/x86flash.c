@@ -22,8 +22,8 @@
 #include <string.h>
 
 const flash_t flash = {
-		.totalSize 	= 256 * 4,
-		.pageSize  	= 256,
+		.totalSize 	= 0x010000,
+		.pageSize  	= 0x0100,
 		.eraseSize 	= EARSE_SIZE,
 		.writeTime 	= 5,
 		.speed		= 400,

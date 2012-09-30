@@ -14,6 +14,9 @@
 /// 是否支持对同一队列同时有多个read open
 #define MULTIPLE_READ 0
 
+/// 是否支持地址修正
+#define NEED_CORRECT_ADDRESS 0
+
 #define DATA_AVAIL 0xfe
 #define DATA_NAN   0xff
 
@@ -31,7 +34,7 @@ typedef struct _Db_child
 
 typedef struct _Db_Info
 {
-	uint8_t flag;
+	uint8_t symbol;
 	uint8_t checksum;
 	Db_time time;
 	Db_child child;
@@ -74,28 +77,27 @@ static Queue ques[ARRAY_LENG(ctrls)];
 static inline void _init(void);
 static inline bool _write(Db_addr addr, void *pdata, size_t len);
 static inline bool _read(Db_addr addr, void *pdata, size_t len);
-static bool _malloc(void);
-static bool _fill_heads(void);
+static bool _init_ques(void);
 static size_t _size_of_info(Queue *pque);
 
 void db_init(void)
 {
 	Db_addr all, used;
-	float use_pec;
+	float use_pec, kb;
 
 	_init();
-	_malloc();
-	_fill_heads();
+	_init_ques();
 
 	all = db.endAddr - db.startAddr;
 	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr;
 	use_pec = 100 * (float)used / (float)all;
+	kb = (float)used / 1024;
 
 	debug("db info:\n");
 	debug("startAddr = %#08x\n", db.startAddr);
 	debug("endAddr   = %#08x\n", db.endAddr);
 	debug("earseSize = %#08x\n", db.earseSize);
-	debug("used: %#08x / %#08x = %.2f%%\n", used, all, use_pec);
+	debug("used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
 }
 
 static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
@@ -218,18 +220,73 @@ static size_t _size_of_info(Queue *pque)
 	if(_have_child(pque))
 		return sizeof(info);
 	else
-		return sizeof(info.flag) + sizeof(info.checksum) + sizeof(info.time.min)
+		return sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time.min)
 		        + sizeof(info.time.hour);
 }
 
 static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t data_len)
 {
-	return 0;
+	uint8_t *p;
+	uint8_t checksum = 0x55;
+	int i;
+	size_t info_len;
+
+	assert(pque != NULL);
+	assert(pinfo != NULL);
+	assert(pdata != NULL);
+
+	p = (uint8_t *)pinfo;
+	info_len = _size_of_info(pque);
+	for(i = 0; i < info_len; i++)
+	{
+		checksum += p[i];
+	}
+
+	p = pdata;
+	for(i = 0; i < data_len; i++)
+	{
+		checksum += p[i];
+	}
+
+	return checksum;
 }
 
-static Db_addr _get_next_addr(Queue *pque, int dirt)
+static Db_addr _get_next_addr(Queue *pque, int dire)
 {
-	return 0;
+	Db_addr addr, curAddr;
+	size_t 	len;
+	Db_addr	area_len;
+
+	if(pque->flags == O_RDONLY)
+		curAddr = pque->readAddr;
+	else if(pque->flags == O_WRONLY)
+		curAddr = pque->writeAddr;
+	else
+		curAddr = 0x00;
+
+	len = _size_of_info(pque) + pque->data_len;
+	area_len = pque->endAddr - pque->startAddr;
+
+	if(dire > 0)
+		addr = curAddr + len;
+	else if(dire < 0)
+		addr = curAddr - len;
+	else
+		addr = curAddr;
+
+	if(addr + len > pque->endAddr)
+		addr = pque->startAddr;
+	else if(addr < pque->startAddr)
+		addr = pque->endAddr - len - (area_len % len);
+
+#if NEED_CORRECT_ADDRESS
+	/* 校正地址 */
+	size_t 	offset;
+	offset = (addr - pque->startAddr) % len;
+	addr -= offset;
+#endif
+
+	return addr;
 }
 
 static Db_child _get_child(Queue *pque)
@@ -276,7 +333,7 @@ bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 	assert(len == pque->data_len);
 	assert(pque->flags == O_WRONLY);
 
-	info.flag = DATA_AVAIL;
+	info.symbol = DATA_AVAIL;
 	info.time = *ptime;
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, len);
@@ -309,7 +366,7 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 	assert(pque->flags == O_RDONLY);
 
 	stat = _read(pque->readAddr, &info, _size_of_info(pque));
-	if(info.flag != DATA_AVAIL)
+	if(info.symbol != DATA_AVAIL)
 		return false;
 
 	stat &= _read(pque->readAddr + _size_of_info(pque), pdata, len);
@@ -402,7 +459,48 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 	return NULL ;
 }
 
-static bool _malloc(void)
+/**
+ *
+ * @param pque
+ * @return
+ * @todo 确认整个头部为空的
+ */
+static Db_addr _find_queue_head(Queue *pque)
+{
+	size_t db_data_len;
+	Db_addr  findAddr;
+	uint8_t symbol;
+	bool found = false;
+	
+	assert(pque != NULL);
+
+	db_data_len = _size_of_info(pque) + pque->data_len;
+	
+	findAddr = pque->startAddr;
+	symbol = 0x00;
+	while((findAddr + db_data_len) < pque->endAddr)
+	{
+		_read(findAddr + FPOS(Db_Info, symbol), &symbol, sizeof(symbol));  //只读取数据的标识
+		if(symbol == DATA_NAN)	//如果是空数据，说明找到了最新数据，即头
+		{
+			found = true;
+			break;
+		}
+		
+		findAddr += db_data_len;
+	}
+	
+	if(!found)
+		findAddr = pque->startAddr;
+	
+	return findAddr;
+}
+
+/** 初始化队列
+ *
+ * @return
+ */
+static bool _init_ques(void)
 {
 	Db_addr addr;
 	Queue *pque;
@@ -423,33 +521,20 @@ static bool _malloc(void)
 		pque->endAddr = pque->startAddr + que_len;
 
 		pque->readAddr = 0x00;
-		pque->writeAddr = 0x00;
+		pque->writeAddr = _find_queue_head(pque);
+		pque->data_len = ctrls[i].data_len;
 		pque->flags = O_NOACCESS;
 
 		if(pque->endAddr > db.endAddr)
 		{
 			debug("DB Error: Out of range!\n");
-			stat = true;
+			stat = false;
 		}
 
 		addr = pque->endAddr + 1;
 	}
 
 	return stat;
-}
-
-static Db_addr _find_queue_head(Queue *pque)
-{
-	return 0;
-}
-
-static bool _fill_heads(void)
-{
-	Queue *pque = NULL;
-
-	_find_queue_head(pque);
-
-	return false;
 }
 
 static inline void _init(void)

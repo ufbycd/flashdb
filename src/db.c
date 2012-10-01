@@ -192,18 +192,15 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 
 		memcpy(pque, _get_que(pctrl), sizeof(Queue));
 		pque->flags = flags;
-		pque->pctrl = pctrl;
 	}
 	else if(flags == O_WRONLY)
 	{
 		pque = _get_que(pctrl);
 		pque->flags = flags;
-		pque->pctrl = pctrl;
 	}
 #else
 	pque = _get_que(pctrl);
 	pque->flags = flags;
-	pque->pctrl = pctrl;
 #endif
 
 	return pque;
@@ -489,6 +486,7 @@ bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
  * @param pque	队列
  * @param ptime	时间输出
  * @return 成功为true,否则为false
+ * @todo  处理坏块
  */
 static bool _read_time(Queue *pque, Db_time *ptime)
 {
@@ -539,9 +537,54 @@ static type2_t _get_child_type(Queue *pque)
  * @param type2
  * @return
  */
-static bool _time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
+static bool _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 {
-	return false;
+	bool stat = false;
+
+	assert(pt1 != NULL);
+	assert(pt2 != NULL);
+
+	switch (type2)
+	{
+		case YEAR:
+			if(pt1->year == pt2->year)
+				stat = true;
+			break;
+
+		case MONTH:
+			if(pt1->year == pt2->year &&
+					pt1->month == pt2->month)
+				stat = true;
+			break;
+
+		case WEEK:
+			if(pt1->year == pt2->year &&
+					pt1->weeks == pt2->weeks)
+				stat = true;
+			break;
+
+		case DAY:
+			if(pt1->year == pt2->year &&
+					pt1->month == pt2->month &&
+					pt1->day == pt2->day)
+				stat = true;
+			break;
+
+		case MIN:
+			if(pt1->year == pt2->year &&
+					pt1->month == pt2->month &&
+					pt1->day == pt2->day &&
+					pt1->hour == pt2->hour &&
+					pt1->min == pt2->min)
+				stat = true;
+			break;
+
+		default:
+			debug("Wrong Type2: %d\n", type2);
+			break;
+	}
+
+	return stat;
 }
 
 /** 定位某类型的数据在队列中的某时间点上的位置
@@ -577,7 +620,7 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 			if(_read_time(pque, &rtime) < 0)
 				break;
 
-			if(_time_match(ptime, &rtime, locate_type2))
+			if(_time_match(locate_type2, ptime, &rtime))
 			{
 				match = TRUE;
 				break;

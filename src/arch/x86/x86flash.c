@@ -39,6 +39,7 @@ static const char *x86flash = "flash.bin";
 	#define debug(fmt, args...)
 #endif
 
+bool flash_test(void);
 
 /**
  *
@@ -89,8 +90,7 @@ void flash_init(void)
 	debug("writeTime  = %u Ms\n", flash.writeTime);
 	debug("speed      = %u KHz\n", flash.speed);
 
-
-//	EEPromTest();
+	flash_test();
 }
 /**
  *
@@ -100,28 +100,28 @@ void flash_init(void)
  * @return
  * @note
  */
-#if 0
-bool EEPromTest(void)
+#if 1
+bool flash_test(void)
 {
 	bool stat;
 	uint16_t rval, wval, bval;
 
-	stat = EEPromRead(0, &rval, sizeof(rval));
+	stat = flash_read(0, &rval, sizeof(rval));
 	bval = rval;
 	wval = ~rval;
 
-	stat &= EEPromWrite(0, &wval, sizeof(rval));
-	stat &= EEPromRead(0, &rval, sizeof(rval));
-	stat &= EEPromWrite(0, &bval, sizeof(rval));
+	stat &= flash_write(0, &wval, sizeof(rval));
+	stat &= flash_read(0, &rval, sizeof(rval));
+	stat &= flash_write(0, &bval, sizeof(rval));
 
 	if(stat && (wval == rval))
 	{
-		debug("EEProm is OK.\n");
+		debug("Flash is OK.\n");
 		return TRUE;
 	}
 	else
 	{
-		debug("EEProm is Fail.\n");
+		debug("Flash is Fail.\n");
 		return FALSE;
 	}
 }

@@ -62,10 +62,16 @@ typedef enum _type2{
 } type2_t;
 
 
-#define O_NOACCESS		00
-#define O_RDONLY	    01
-#define O_WRONLY	    02
-//#define O_RDWR		03
+#define O_NOACCESS	00
+#define O_RDONLY	01
+#define O_WRONLY	02
+//#define O_RDWR	03
+
+/* The possibilities for the third argument to `fseek'.
+   These values should not be changed.  */
+#define SEEK_SET	0	/* Seek from beginning of file.  */
+#define SEEK_CUR	1	/* Seek from current position.  */
+#define SEEK_END	2	/* Seek from end of file.  */
 
 void db_init(void);
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...);

@@ -13,9 +13,10 @@
 
 /// 是否支持对同一队列同时有多个read open
 #define MULTIPLE_READ 0
-
 /// 是否在地址递变时执行地址修正
 #define DO_CORRECT_ADDRESS 0
+/// 是否需要加密数据
+#define NEED_ENCRYPT 1
 
 #define DATA_AVAIL 0xfe
 #define DATA_NAN   0xff
@@ -85,8 +86,8 @@ static Queue ques[ARRAY_LENG(ctrls)];
 #endif
 
 static inline void _init(void);
-static inline bool _write(Db_addr addr, void *pdata, size_t len);
-static inline bool _read(Db_addr addr, void *pdata, size_t len);
+static bool _write(Db_addr addr, void *pdata, size_t len);
+static bool _read(Db_addr addr, void *pdata, size_t len);
 static bool _init_ques(void);
 static size_t _size_of_info(Queue *pque);
 
@@ -172,7 +173,7 @@ static Queue *_get_que(Ctrl *pctrl)
  * @param type2
  * @param flags
  * @return
- * @todo	添加随机访问操作完成后指针递变方向的选项
+ * @todo	更改为类似于fopen的格式
  */
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
@@ -729,6 +730,36 @@ static inline void _init(void)
 	flash_init();
 }
 
+/** 数据加密
+ *
+ * @param dst
+ * @param src
+ * @param len
+ */
+static void _encrypt(void *dst, void *src, size_t len)
+{
+	int i;
+	uint8_t *pd = dst;
+	uint8_t *ps = src;
+
+	assert(dst != NULL);
+	assert(src != NULL);
+
+	for(i = 0; i < len; i++)
+		pd[i] = ps[i] ^ 0x55;
+}
+
+/** 数据解密
+ *
+ * @param dst
+ * @param src
+ * @param len
+ */
+static inline void _decrypt(void *dst, void *src, size_t len)
+{
+	_encrypt(dst, src, len);
+}
+
 /** 底层硬件的写操作
  *
  * @param addr
@@ -736,9 +767,16 @@ static inline void _init(void)
  * @param len
  * @return
  */
-static inline bool _write(Db_addr addr, void *pdata, size_t len)
+static bool _write(Db_addr addr, void *pdata, size_t len)
 {
 	assert(pdata != NULL);
+
+#if NEED_ENCRYPT
+	uint8_t buf[len];
+
+	_encrypt(&buf, pdata, len);
+	pdata = &buf;
+#endif
 
 	return flash_write(addr, pdata, len);
 }
@@ -750,9 +788,20 @@ static inline bool _write(Db_addr addr, void *pdata, size_t len)
  * @param len
  * @return
  */
-static inline bool _read(Db_addr addr, void *pdata, size_t len)
+static bool _read(Db_addr addr, void *pdata, size_t len)
 {
 	assert(pdata != NULL);
 
+#if NEED_ENCRYPT
+	uint8_t buf[len];
+
+	if(!flash_read(addr, &buf, len))
+		return false;
+
+	_decrypt(pdata, &buf, len);
+
+	return true;
+#else
 	return flash_read(addr, pdata, len);
+#endif
 }

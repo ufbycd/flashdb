@@ -26,6 +26,7 @@
 #define DAY_NUM	48
 #define MINUS_NUM	(DAY_NUM * 48)
 
+/// @todo 提供擦除的掩码值,以优化地址递变和擦除的判断
 static const struct
 {
 	Db_addr startAddr;
@@ -102,8 +103,8 @@ void db_init(void)
 
 	all = db.endAddr - db.startAddr + 1;
 	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr + 1;
-	use_pec = 100 * (float)used / (float)all;
-	kb = (float)used / 1024;
+	use_pec = 100.0 * used / all;
+	kb = used / 1024.0;
 
 	debug("db info:\n");
 	debug("startAddr = %#08x\n", db.startAddr);
@@ -171,6 +172,7 @@ static Queue *_get_que(Ctrl *pctrl)
  * @param type2
  * @param flags
  * @return
+ * @todo	添加随机访问操作完成后指针递变方向的选项
  */
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
@@ -221,7 +223,7 @@ bool db_close(Queue *pque)
 	{
 		/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
 		Queue *pmain_que = _get_que(pque->pctrl);
-		pmain_que->readAddr = pque->readAddr;
+		pmain_que->accessAddr = pque->accessAddr;
 		pmain_que->flags = O_NOACCESS;
 
 		free(pque);
@@ -320,15 +322,7 @@ static Db_addr _get_next_addr(Queue *pque, int dire)
 
 	assert(pque != NULL);
 
-	if(pque->flags == O_RDONLY)
-		curAddr = pque->readAddr;
-	else if(pque->flags == O_WRONLY)
-		curAddr = pque->writeAddr;
-	else
-	{
-		debug("Wrong flags !\n");
-		return 0x00;
-	}
+	curAddr = pque->accessAddr;
 
 	len = _size_of_info(pque) + pque->data_len;
 	area_len = pque->endAddr - pque->startAddr;
@@ -409,10 +403,10 @@ bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
-	_write(pque->writeAddr, &info, _size_of_info(pque));
-	_write(pque->writeAddr + _size_of_info(pque), pdata, data_len);
+	_write(pque->headAddr, &info, _size_of_info(pque));
+	_write(pque->headAddr + _size_of_info(pque), pdata, data_len);
 
-	pque->writeAddr = _get_next_addr(pque, 1);
+	pque->headAddr = _get_next_addr(pque, 1);
 
 	return true;
 }
@@ -439,11 +433,11 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	if(pdata == NULL)
 		pdata = &buf;
 
-	stat = _read(pque->readAddr, &info, _size_of_info(pque));
+	stat = _read(pque->accessAddr, &info, _size_of_info(pque));
 	if(info.symbol != DATA_AVAIL)
 		return false;
 
-	stat &= _read(pque->readAddr + _size_of_info(pque), pdata, data_len);
+	stat &= _read(pque->accessAddr + _size_of_info(pque), pdata, data_len);
 	if(info.checksum != _calc_checksum(pque, &info, pdata, data_len))
 		return false;
 
@@ -463,7 +457,6 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
  * @param ptime
  * @param data_len
  * @return
- * @todo	db_write为随机写，若要实现，需要在Queue结构添加 headAddr 成员
  */
 #if 0
 bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
@@ -711,8 +704,8 @@ static bool _init_ques(void)
 		que_len = ( 2 + datas_len / db.earseSize) * db.earseSize;
 		pque->endAddr = pque->startAddr + que_len;
 
-		pque->readAddr = 0x00;
-		pque->writeAddr = _find_queue_head(pque);
+		pque->accessAddr = 0x00;
+		pque->headAddr = _find_queue_head(pque);
 		pque->data_len = ctrls[i].data_len;
 		pque->flags = O_NOACCESS;
 

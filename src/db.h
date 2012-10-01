@@ -30,8 +30,8 @@ typedef uint32_t Db_addr;
 typedef struct _queue {
 	Db_addr startAddr;
 	Db_addr endAddr;
-	Db_addr writeAddr;
-	Db_addr readAddr;
+	Db_addr headAddr;
+	Db_addr accessAddr;
 	size_t	 data_len;
 	int		flags;
 	const void	*pctrl;
@@ -74,9 +74,9 @@ bool db_close(Queue *pque);
 bool db_seek(Queue *pque, int sym);
 Queue *db_locate(type1_t type1, type2_t type2, Db_time *ptime);
 
-bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
 bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
 bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
+//bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
 
 
 #endif /* DB_H_ */

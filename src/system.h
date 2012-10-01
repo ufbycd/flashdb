@@ -39,7 +39,7 @@
 #endif
 
 /* 数组的长度 */
-#define ARRAY_LENG(a) (sizeof(a)/sizeof(a[0]))
+#define ARRAY_LENG(a) (sizeof(a) / sizeof(a[0]))
 /* 得到一个field在结构体(struct)中的偏移量 */
 #define FPOS(type, field) ( (size_t) &(( type *)0)-> field )
 /* 得到一个结构体中field所占用的字节数 */

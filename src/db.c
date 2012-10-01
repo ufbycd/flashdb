@@ -20,6 +20,12 @@
 #define DATA_AVAIL 0xfe
 #define DATA_NAN   0xff
 
+#define YEAR_NUM 	2
+#define MONTH_NUM 14
+#define WEEK_NUM	7
+#define DAY_NUM	48
+#define MINUS_NUM	(DAY_NUM * 48)
+
 static const struct
 {
 	Db_addr startAddr;
@@ -61,11 +67,11 @@ typedef struct _Test_Data
 } Test_data;
 
 static Ctrl ctrls[] = {
-		{ TEST, MIN, 	NONE1,	sizeof(Test_data), 2500, 0},
-		{ TEST, DAY, 	MIN,	sizeof(Test_data), 48,	1},
-		{ TEST, WEEK, 	DAY,	sizeof(Test_data), 7,	2},
-		{ TEST, MONTH, 	DAY,	sizeof(Test_data), 14,	3},
-		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), 2,	4},
+		{ TEST, MIN, 	NONE1,	sizeof(Test_data), MINUS_NUM, 0},
+		{ TEST, DAY, 	MIN,	sizeof(Test_data), DAY_NUM,	1},
+		{ TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
+		{ TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
+		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
 };
 
 static Queue ques[ARRAY_LENG(ctrls)];
@@ -323,7 +329,7 @@ static Db_addr _get_next_addr(Queue *pque, int dire)
 		curAddr = pque->writeAddr;
 	else
 	{
-		debug("Wrong flags of db_open !\n");
+		debug("Wrong flags !\n");
 		return 0x00;
 	}
 

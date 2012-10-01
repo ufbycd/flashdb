@@ -315,15 +315,13 @@ static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t d
  * @param dire
  * @return
  */
-static Db_addr _get_next_addr(Queue *pque, int dire)
+static Db_addr _get_next_addr(Queue *pque, Db_addr curAddr, int dire)
 {
-	Db_addr addr, curAddr;
+	Db_addr addr;
 	size_t 	len;
 	Db_addr	area_len;
 
 	assert(pque != NULL);
-
-	curAddr = pque->accessAddr;
 
 	len = _size_of_info(pque) + pque->data_len;
 	area_len = pque->endAddr - pque->startAddr;
@@ -366,10 +364,10 @@ static Db_child _get_child(Queue *pque)
 	pctrl = pque->pctrl;
 	if(pctrl->child_type2 != NONE2)
 	{
-		pchild_que = db_open(pctrl->type1, pctrl->child_type2, O_WRONLY);
+		pchild_que = db_open(pctrl->type1, pctrl->child_type2, O_RDONLY);
 		assert(pchild_que != NULL);
 
-		child.startAddr = _get_next_addr(pchild_que, -1);
+		child.startAddr = _get_next_addr(pchild_que, pchild_que->headAddr, -1);
 		db_close(pchild_que);
 	}
 	else
@@ -407,7 +405,7 @@ bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	_write(pque->headAddr, &info, _size_of_info(pque));
 	_write(pque->headAddr + _size_of_info(pque), pdata, data_len);
 
-	pque->headAddr = _get_next_addr(pque, 1);
+	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
 
 	return true;
 }

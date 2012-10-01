@@ -14,8 +14,8 @@
 /// 是否支持对同一队列同时有多个read open
 #define MULTIPLE_READ 0
 
-/// 是否支持地址修正
-#define NEED_CORRECT_ADDRESS 0
+/// 是否在地址递变时执行地址修正
+#define DO_CORRECT_ADDRESS 0
 
 #define DATA_AVAIL 0xfe
 #define DATA_NAN   0xff
@@ -25,7 +25,10 @@ static const struct
 	Db_addr startAddr;
 	Db_addr endAddr;
 	Db_addr earseSize;
-} db = {0x0100, 0xff00, EARSE_SIZE};
+} db = {.startAddr = 0x0100,
+		.endAddr   = 0xfeff,
+		.earseSize = EARSE_SIZE
+};
 
 typedef struct _Db_child
 {
@@ -88,8 +91,8 @@ void db_init(void)
 	_init();
 	_init_ques();
 
-	all = db.endAddr - db.startAddr;
-	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr;
+	all = db.endAddr - db.startAddr + 1;
+	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr + 1;
 	use_pec = 100 * (float)used / (float)all;
 	kb = (float)used / 1024;
 
@@ -97,7 +100,7 @@ void db_init(void)
 	debug("startAddr = %#08x\n", db.startAddr);
 	debug("endAddr   = %#08x\n", db.endAddr);
 	debug("earseSize = %#08x\n", db.earseSize);
-	debug("used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
+	debug("data used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
 }
 
 static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
@@ -105,7 +108,7 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 	int i;
 	Ctrl *pctrl = NULL;
 
-	for(i = 0; i < sizeof(ctrls) / sizeof(ctrls[0]); ++i)
+	for(i = 0; i < ARRAY_LENG(ctrls); ++i)
 	{
 		if(ctrls[i].type1 != type1)
 		{
@@ -114,6 +117,7 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 		else if(ctrls[i].type2 == type2)
 		{
 			pctrl = &ctrls[i];
+			break;
 		}
 	}
 
@@ -147,8 +151,8 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	Queue *pque = NULL;
 
 	pctrl = _get_ctrl(type1, type2);
-	if(pctrl == NULL )
-		return NULL ;
+
+	assert(pctrl != NULL);
 
 #if MULTIPLE_READ
 	if(flags == O_RDONLY)
@@ -206,6 +210,8 @@ static bool _have_child(Queue *pque)
 {
 	Ctrl *pctrl;
 
+	assert(pque != NULL);
+
 	pctrl = pque->pctrl;
 	if(pctrl->child_type2 == NONE2)
 		return false;
@@ -216,6 +222,8 @@ static bool _have_child(Queue *pque)
 static size_t _size_of_info(Queue *pque)
 {
 	Db_Info info;
+
+	assert(pque != NULL);
 
 	if(_have_child(pque))
 		return sizeof(info);
@@ -257,12 +265,17 @@ static Db_addr _get_next_addr(Queue *pque, int dire)
 	size_t 	len;
 	Db_addr	area_len;
 
+	assert(pque != NULL);
+
 	if(pque->flags == O_RDONLY)
 		curAddr = pque->readAddr;
 	else if(pque->flags == O_WRONLY)
 		curAddr = pque->writeAddr;
 	else
-		curAddr = 0x00;
+	{
+		debug("Wrong flags of db_open !\n");
+		return 0x00;
+	}
 
 	len = _size_of_info(pque) + pque->data_len;
 	area_len = pque->endAddr - pque->startAddr;
@@ -279,7 +292,7 @@ static Db_addr _get_next_addr(Queue *pque, int dire)
 	else if(addr < pque->startAddr)
 		addr = pque->endAddr - len - (area_len % len);
 
-#if NEED_CORRECT_ADDRESS
+#if DO_CORRECT_ADDRESS
 	/* 校正地址 */
 	size_t 	offset;
 	offset = (addr - pque->startAddr) % len;
@@ -324,22 +337,22 @@ static Db_child _get_child(Queue *pque)
  * @todo	验证写入的正确性
  * @todo	处理坏块
  */
-bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
+bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 {
 	Db_Info info;
 
 	assert(pque != NULL);
 	assert(pdata != NULL);
-	assert(len == pque->data_len);
+	assert(data_len == pque->data_len);
 	assert(pque->flags == O_WRONLY);
 
 	info.symbol = DATA_AVAIL;
 	info.time = *ptime;
 	info.child = _get_child(pque);
-	info.checksum = _calc_checksum(pque, &info, pdata, len);
+	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
 	_write(pque->writeAddr, &info, _size_of_info(pque));
-	_write(pque->writeAddr + _size_of_info(pque), pdata, len);
+	_write(pque->writeAddr + _size_of_info(pque), pdata, data_len);
 
 	pque->writeAddr = _get_next_addr(pque, 1);
 
@@ -355,22 +368,26 @@ bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t len)
  * @return
  * @todo	处理坏块
  */
-bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
+bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 {
 	Db_Info info;
+	uint8_t buf[data_len];
 	bool stat;
 
 	assert(pque != NULL);
-	assert(pdata != NULL);
-	assert(len == pque->data_len);
+//	assert(pdata != NULL);
+	assert(data_len == pque->data_len);
 	assert(pque->flags == O_RDONLY);
+
+	if(pdata == NULL)
+		pdata = &buf;
 
 	stat = _read(pque->readAddr, &info, _size_of_info(pque));
 	if(info.symbol != DATA_AVAIL)
 		return false;
 
-	stat &= _read(pque->readAddr + _size_of_info(pque), pdata, len);
-	if(info.checksum != _calc_checksum(pque, &info, pdata, len))
+	stat &= _read(pque->readAddr + _size_of_info(pque), pdata, data_len);
+	if(info.checksum != _calc_checksum(pque, &info, pdata, data_len))
 		return false;
 
 	if(ptime != NULL )
@@ -382,21 +399,58 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t len)
 	return true;
 }
 
-static bool _read_time(Queue *pque, Db_time *ptime)
+/**
+ *
+ * @param pque
+ * @param pdata
+ * @param ptime
+ * @param data_len
+ * @return
+ * @todo	db_write为随机写，若要实现，需要在Queue结构添加 headAddr 成员
+ */
+#if 0
+bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 {
 
+
+	assert(pque != NULL);
+	assert(pdata != NULL);
+	assert(data_len == pque->data_len);
+	assert(pque->flags == O_WRONLY);
+
+
+
 	return false;
+}
+#endif
+
+static bool _read_time(Queue *pque, Db_time *ptime)
+{
+	size_t data_len;
+
+	assert(pque != NULL);
+	assert(ptime != NULL);
+
+	data_len = _size_of_info(pque) + pque->data_len;
+
+	return db_read(pque, NULL, ptime, data_len);
 }
 
 bool db_seek(Queue *pque, int sym)
 {
+
+	assert(pque != NULL);
 
 	return 0;
 }
 
 static type2_t _get_child_type(Queue *pque)
 {
-	Ctrl *pctrl = pque->pctrl;
+	Ctrl *pctrl;
+
+	assert(pque != NULL);
+
+	pctrl = pque->pctrl;
 
 	return pctrl->child_type2;
 }
@@ -406,12 +460,22 @@ static bool _time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
 	return false;
 }
 
+/**
+ *
+ * @param type1
+ * @param type2
+ * @param ptime
+ * @return
+ * @todo	区分周数据的定位
+ */
 Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 {
 	Queue *pque;
 	type2_t locate_type2, next_type2;
 	Db_time rtime;
 	bool match;
+
+	assert(ptime != NULL);
 
 //	pctrl = get_ctrl_by_type(type1, YEAR);
 //	pque = _get_que(pctrl);
@@ -527,7 +591,7 @@ static bool _init_ques(void)
 
 		if(pque->endAddr > db.endAddr)
 		{
-			debug("DB Error: Out of range!\n");
+			debug("DB Init Error: Out of range!\n");
 			stat = false;
 		}
 
@@ -551,6 +615,8 @@ static inline void _init(void)
  */
 static inline bool _write(Db_addr addr, void *pdata, size_t len)
 {
+	assert(pdata != NULL);
+
 	return flash_write(addr, pdata, len);
 }
 
@@ -563,5 +629,7 @@ static inline bool _write(Db_addr addr, void *pdata, size_t len)
  */
 static inline bool _read(Db_addr addr, void *pdata, size_t len)
 {
+	assert(pdata != NULL);
+
 	return flash_read(addr, pdata, len);
 }

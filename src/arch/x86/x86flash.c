@@ -22,7 +22,8 @@
 #include <string.h>
 
 const flash_t flash = {
-		.totalSize 	= 0x010000,
+		.startAddr 	= 0x00,
+		.endAddr	= 0xffff,
 		.pageSize  	= 0x0100,
 		.eraseSize 	= EARSE_SIZE,
 		.writeTime 	= 5,
@@ -51,7 +52,7 @@ void flash_init(void)
 {
 	FILE *fp;
 	uint8_t page[flash.pageSize];
-	int pageCount = flash.totalSize / flash.pageSize;
+	int pageCount = (flash.endAddr - flash.startAddr + 1) / flash.pageSize;
 	int i;
 
 	memset(page, 0xffffffff, sizeof(page));
@@ -82,7 +83,7 @@ void flash_init(void)
 	fclose(fp);
 
 	debug("Flash information:\n");
-	debug("totalSize  = %u bytes\n", flash.totalSize);
+	debug("totalSize  = %u bytes\n", flash.endAddr - flash.startAddr + 1);
 	debug("pageSize   = %u bytes\n", flash.pageSize);
 	debug("eraseSize  = %u bytes\n", flash.eraseSize);
 	debug("writeTime  = %u Ms\n", flash.writeTime);

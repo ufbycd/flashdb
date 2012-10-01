@@ -10,10 +10,11 @@
 
 #include "system.h"
 
-#define EARSE_SIZE	0x0100
+#define EARSE_SIZE	256
 
 typedef struct _Flash{
-	uint32_t	totalSize;
+	uint32_t	startAddr;
+	uint32_t	endAddr;
 	uint32_t	pageSize;
 	uint32_t	eraseSize;
 	int			writeTime;

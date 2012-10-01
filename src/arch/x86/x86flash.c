@@ -154,6 +154,28 @@ bool flash_write(uint32_t addr, void * const buf, uint32_t len)
 		return FALSE;
 	}
 
+	if(addr % flash.eraseSize == 0)
+	{
+		uint8_t ebuf[flash.eraseSize];
+
+		memset(&ebuf, 0xffffffff, sizeof(ebuf));
+
+		if(fwrite(ebuf, 1, sizeof(ebuf), wf) != sizeof(ebuf))
+		{
+			debug("file write error!\n");
+			fclose(wf);
+			return FALSE;
+		}
+
+		if(fseek(wf, addr, SEEK_SET) != 0)
+		{
+			debug("Can not seek file: %s!\n", x86flash);
+			fclose(wf);
+			return FALSE;
+		}
+
+	}
+
 	if(fwrite(buf, 1, len, wf) != len)
 	{
 		debug("file write error!\n");

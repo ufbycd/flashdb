@@ -83,6 +83,9 @@ static inline bool _read(Db_addr addr, void *pdata, size_t len);
 static bool _init_ques(void);
 static size_t _size_of_info(Queue *pque);
 
+/** db初始化
+ *
+ */
 void db_init(void)
 {
 	Db_addr all, used;
@@ -103,6 +106,12 @@ void db_init(void)
 	debug("data used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
 }
 
+/** 获取某数据对应的控制快
+ *
+ * @param type1
+ * @param type2
+ * @return
+ */
 static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 {
 	int i;
@@ -124,6 +133,11 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
 	return pctrl;
 }
 
+/** 获取队列结构
+ *
+ * @param pctrl
+ * @return
+ */
 static Queue *_get_que(Ctrl *pctrl)
 {
 	assert(pctrl != NULL);
@@ -145,6 +159,13 @@ static Queue *_get_que(Ctrl *pctrl)
 
 }
 
+/** 打开队列
+ *
+ * @param type1
+ * @param type2
+ * @param flags
+ * @return
+ */
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
 	Ctrl *pctrl;
@@ -182,6 +203,11 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	return pque;
 }
 
+/** 关闭已打开的队列
+ *
+ * @param pque
+ * @return
+ */
 bool db_close(Queue *pque)
 {
 
@@ -206,6 +232,11 @@ bool db_close(Queue *pque)
 	return true;
 }
 
+/** 判断队列是否有子类数据
+ *
+ * @param pque
+ * @return
+ */
 static bool _have_child(Queue *pque)
 {
 	Ctrl *pctrl;
@@ -219,6 +250,11 @@ static bool _have_child(Queue *pque)
 	return true;
 }
 
+/** 获取队列的info结构的长度
+ *
+ * @param pque
+ * @return
+ */
 static size_t _size_of_info(Queue *pque)
 {
 	Db_Info info;
@@ -232,6 +268,14 @@ static size_t _size_of_info(Queue *pque)
 		        + sizeof(info.time.hour);
 }
 
+/** 计算校验码
+ *
+ * @param pque
+ * @param pinfo
+ * @param pdata
+ * @param data_len
+ * @return
+ */
 static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t data_len)
 {
 	uint8_t *p;
@@ -259,6 +303,12 @@ static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t d
 	return checksum;
 }
 
+/** 获取队列在当前位置的下一地址
+ *
+ * @param pque
+ * @param dire
+ * @return
+ */
 static Db_addr _get_next_addr(Queue *pque, int dire)
 {
 	Db_addr addr, curAddr;
@@ -302,6 +352,11 @@ static Db_addr _get_next_addr(Queue *pque, int dire)
 	return addr;
 }
 
+/** 获取队列的子类数据的地址信息
+ *
+ * @param pque
+ * @return
+ */
 static Db_child _get_child(Queue *pque)
 {
 	Db_child child;
@@ -327,7 +382,7 @@ static Db_child _get_child(Queue *pque)
 	return child;
 }
 
-/**
+/** 顺序追加数据
  *
  * @param pctrl
  * @param pdata
@@ -359,12 +414,11 @@ bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	return true;
 }
 
-/**
+/** 随机读取数据
  *
- * @param pctrl
+ * @param pque
  * @param pdata
  * @param len
- * @param dirt
  * @return
  * @todo	处理坏块
  */
@@ -399,7 +453,7 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	return true;
 }
 
-/**
+/** 随机写入数据
  *
  * @param pque
  * @param pdata
@@ -424,6 +478,12 @@ bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 }
 #endif
 
+/** 读取时间
+ *
+ * @param pque	队列
+ * @param ptime	时间输出
+ * @return 成功为true,否则为false
+ */
 static bool _read_time(Queue *pque, Db_time *ptime)
 {
 	size_t data_len;
@@ -436,6 +496,12 @@ static bool _read_time(Queue *pque, Db_time *ptime)
 	return db_read(pque, NULL, ptime, data_len);
 }
 
+/** 移动队列访问指针
+ *
+ * @param pque
+ * @param sym
+ * @return
+ */
 bool db_seek(Queue *pque, int sym)
 {
 
@@ -444,6 +510,11 @@ bool db_seek(Queue *pque, int sym)
 	return 0;
 }
 
+/** 获取队列的子类数据的类型
+ *
+ * @param pque
+ * @return
+ */
 static type2_t _get_child_type(Queue *pque)
 {
 	Ctrl *pctrl;
@@ -455,12 +526,19 @@ static type2_t _get_child_type(Queue *pque)
 	return pctrl->child_type2;
 }
 
+/** 判断给定数据类型上的两时间是否相同
+ *
+ * @param pt1
+ * @param pt2
+ * @param type2
+ * @return
+ */
 static bool _time_match(Db_time *pt1, Db_time *pt2, type2_t type2)
 {
 	return false;
 }
 
-/**
+/** 定位某类型的数据在队列中的某时间点上的位置
  *
  * @param type1
  * @param type2
@@ -523,7 +601,7 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 	return NULL ;
 }
 
-/**
+/** 找出队列的头部
  *
  * @param pque
  * @return
@@ -601,12 +679,15 @@ static bool _init_ques(void)
 	return stat;
 }
 
+/** 底层硬件的初始化
+ *
+ */
 static inline void _init(void)
 {
 	flash_init();
 }
 
-/**
+/** 底层硬件的写操作
  *
  * @param addr
  * @param pdata
@@ -620,7 +701,7 @@ static inline bool _write(Db_addr addr, void *pdata, size_t len)
 	return flash_write(addr, pdata, len);
 }
 
-/**
+/** 底层硬件的读操作
  *
  * @param addr
  * @param pdata

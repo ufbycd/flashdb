@@ -293,8 +293,8 @@ static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t d
 	assert(pinfo != NULL);
 	assert(pdata != NULL);
 
-	p = (uint8_t *)pinfo;
-	info_len = _size_of_info(pque);
+	p = (uint8_t *)pinfo + sizeof(pinfo->symbol) + sizeof(pinfo->checksum);
+	info_len = _size_of_info(pque) - (sizeof(pinfo->symbol) + sizeof(pinfo->checksum));
 	for(i = 0; i < info_len; i++)
 	{
 		checksum += p[i];

@@ -42,7 +42,7 @@ static const struct
 	Db_addr startAddr;
 	Db_addr endAddr;
 	Db_addr earseSize;
-} db = {.startAddr = 0x0100,
+} db = {.startAddr = 0x0155,
 		.endAddr   = 0xfeff,
 		.earseSize = EARSE_SIZE
 };
@@ -685,6 +685,8 @@ static Db_addr _find_queue_head(Queue *pque)
 	if(!found)
 		findAddr = pque->startAddr;
 	
+	debug("Head: %#08x\n", findAddr);
+
 	return findAddr;
 }
 
@@ -694,7 +696,7 @@ static Db_addr _find_queue_head(Queue *pque)
  */
 static bool _init_ques(void)
 {
-	Db_addr addr;
+	Db_addr addr, left;
 	Queue *pque;
 	size_t datas_len;	// 所有 info信息 + 待存储数据 长度之和
 	size_t que_len;			// 队列所需的长度
@@ -702,6 +704,14 @@ static bool _init_ques(void)
 	bool stat = true;
 
 	addr = db.startAddr;
+
+	/* 确保队列的起始地址位于页的起始地址 */
+	left = addr % db.earseSize;
+	if(left)
+	{
+		addr += db.earseSize - left;
+	}
+
 	for(i = 0; i < ARRAY_LENG(ctrls); i++)
 	{
 		pque = &ques[i];
@@ -710,10 +720,12 @@ static bool _init_ques(void)
 		pque->startAddr = addr;
 		datas_len = (_size_of_info(pque) + ctrls[i].data_len) * ctrls[i].max_num;
 		que_len = ( 2 + datas_len / db.earseSize) * db.earseSize;
-		pque->endAddr = pque->startAddr + que_len;
+		pque->endAddr = pque->startAddr + que_len - 1;
 
-		pque->accessAddr = 0x00;
+		debug("Address: [%#08x, %#08x]\n", pque->startAddr, pque->endAddr);
+
 		pque->headAddr = _find_queue_head(pque);
+		pque->accessAddr = pque->headAddr;
 		pque->data_len = ctrls[i].data_len;
 		pque->flags = O_NOACCESS;
 

@@ -18,8 +18,17 @@
 /// 是否需要加密数据
 #define NEED_ENCRYPT 1
 
-#define DATA_AVAIL 0xfe
-#define DATA_NAN   0xff
+#if NEED_ENCRYPT
+#	define ENCRYPT(a) (a ^ 0x55)
+#else
+#	define ENCRYPT(a) (a)
+#endif
+
+/// @note 目前要求加密与解密必须完全相同
+#define DECRYPT(a) ENCRYPT(a)
+
+#define DATA_AVAIL DECRYPT(0xfe)
+#define DATA_NAN   DECRYPT(0xff)
 
 #define YEAR_NUM 	2
 #define MONTH_NUM 14

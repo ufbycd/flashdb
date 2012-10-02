@@ -32,7 +32,6 @@ typedef struct _queue {
 	Db_addr endAddr;
 	Db_addr headAddr;
 	Db_addr accessAddr;
-	size_t	 data_len;
 	int		flags;
 	int 	dire;
 	const void	*pctrl;

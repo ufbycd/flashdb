@@ -98,7 +98,7 @@ static inline void _init(void);
 static bool _write(Db_addr addr, void *pdata, size_t len);
 static bool _read(Db_addr addr, void *pdata, size_t len);
 static bool _init_ques(void);
-static size_t _size_of_info(Queue *pque);
+static size_t _info_len(Queue *pque);
 
 /** db初始化
  *
@@ -114,6 +114,7 @@ void db_init(void)
 	debug("startAddr = %#08x\n", db.startAddr);
 	debug("endAddr   = %#08x\n", db.endAddr);
 	debug("earseSize = %#08x\n", db.earseSize);
+	debug("Sizeof ques[] = %lu\n", sizeof(ques));
 
 	_init_ques();	// 初始化队列
 
@@ -184,6 +185,7 @@ static Queue *_get_que(Ctrl *pctrl)
  * @param type2
  * @param flags
  * @return
+ * @todo	合并队列结构中的flags 和 dire
  */
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
@@ -273,7 +275,7 @@ static bool _have_child(Queue *pque)
  * @param pque
  * @return
  */
-static size_t _size_of_info(Queue *pque)
+static size_t _info_len(Queue *pque)
 {
 	Db_Info info;
 
@@ -284,6 +286,38 @@ static size_t _size_of_info(Queue *pque)
 	else
 		return sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time.min)
 		        + sizeof(info.time.hour);
+}
+
+/** 获取客户数据的长度
+ *
+ * @param pque
+ * @return
+ */
+static size_t _data_len(Queue *pque)
+{
+	Ctrl *pctrl;
+
+	assert(pque != NULL);
+
+	pctrl = pque->pctrl;
+
+	return pctrl->data_len;
+}
+
+/** 获取客户数据和其info结构的长度之和
+ *
+ * @param pque
+ * @return
+ */
+static size_t _db_data_len(Queue *pque)
+{
+	Ctrl *pctrl;
+
+	assert(pque != NULL);
+
+	pctrl = pque->pctrl;
+
+	return pctrl->data_len + _info_len(pque);
 }
 
 /** 计算校验码
@@ -306,7 +340,7 @@ static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t d
 	assert(pdata != NULL);
 
 	p = (uint8_t *)pinfo + sizeof(pinfo->symbol) + sizeof(pinfo->checksum);
-	info_len = _size_of_info(pque) - (sizeof(pinfo->symbol) + sizeof(pinfo->checksum));
+	info_len = _info_len(pque) - (sizeof(pinfo->symbol) + sizeof(pinfo->checksum));
 	for(i = 0; i < info_len; i++)
 	{
 		checksum += p[i];
@@ -335,7 +369,7 @@ static Db_addr _get_next_addr(Queue *pque, Db_addr curAddr, int dire)
 
 	assert(pque != NULL);
 
-	len = _size_of_info(pque) + pque->data_len;
+	len = _db_data_len(pque);
 	area_len = pque->endAddr - pque->startAddr;
 
 	if(dire > 0)
@@ -406,7 +440,7 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 	assert(pdata != NULL);
-	assert(data_len == pque->data_len);
+	assert(data_len == _data_len(pque));
 	assert(pque->flags == DB_A);
 
 	info.symbol = DATA_AVAIL;
@@ -414,8 +448,8 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
-	_write(pque->headAddr, &info, _size_of_info(pque));
-	_write(pque->headAddr + _size_of_info(pque), pdata, data_len);
+	_write(pque->headAddr, &info, _info_len(pque));
+	_write(pque->headAddr + _info_len(pque), pdata, data_len);
 
 	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
 
@@ -438,17 +472,17 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 //	assert(pdata != NULL);
-	assert(data_len == pque->data_len);
+	assert(data_len == _data_len(pque));
 	assert(pque->flags == DB_R);
 
 	if(pdata == NULL)
 		pdata = &buf;
 
-	stat = _read(pque->accessAddr, &info, _size_of_info(pque));
+	stat = _read(pque->accessAddr, &info, _info_len(pque));
 	if(info.symbol != DATA_AVAIL)
 		return false;
 
-	stat &= _read(pque->accessAddr + _size_of_info(pque), pdata, data_len);
+	stat &= _read(pque->accessAddr + _info_len(pque), pdata, data_len);
 	if(info.checksum != _calc_checksum(pque, &info, pdata, data_len))
 		return false;
 
@@ -495,14 +529,10 @@ bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
  */
 static bool _read_time(Queue *pque, Db_time *ptime)
 {
-	size_t data_len;
-
 	assert(pque != NULL);
 	assert(ptime != NULL);
 
-	data_len = _size_of_info(pque) + pque->data_len;
-
-	return db_read(pque, NULL, data_len, ptime);
+	return db_read(pque, NULL, _data_len(pque), ptime);
 }
 
 /** 移动队列访问指针
@@ -510,6 +540,7 @@ static bool _read_time(Queue *pque, Db_time *ptime)
  * @param pque
  * @param sym
  * @return
+ * @todo	要定位到队列的尾，需要在队列结构中添加尾指针成员
  */
 bool db_seek(Queue *pque, int ndata, int whence, int dire)
 {
@@ -704,7 +735,7 @@ static Db_addr _find_queue_head(Queue *pque)
 	
 	assert(pque != NULL);
 
-	db_data_len = _size_of_info(pque) + pque->data_len;
+	db_data_len = _db_data_len(pque);
 	
 	findAddr = pque->startAddr;
 	symbol = 0x00;
@@ -756,7 +787,7 @@ static bool _init_ques(void)
 		pque->pctrl = &ctrls[i];
 
 		pque->startAddr = addr;
-		datas_len = (_size_of_info(pque) + ctrls[i].data_len) * ctrls[i].max_num;
+		datas_len = (_info_len(pque) + ctrls[i].data_len) * ctrls[i].max_num;
 		que_len = ( 2 + datas_len / db.earseSize) * db.earseSize;
 		pque->endAddr = pque->startAddr + que_len - 1;
 
@@ -764,7 +795,6 @@ static bool _init_ques(void)
 
 		pque->headAddr = _find_queue_head(pque);
 		pque->accessAddr = pque->headAddr;
-		pque->data_len = ctrls[i].data_len;
 		pque->flags = DB_N;
 		pque->dire = 0;
 

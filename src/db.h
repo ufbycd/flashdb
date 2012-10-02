@@ -34,6 +34,7 @@ typedef struct _queue {
 	Db_addr accessAddr;
 	size_t	 data_len;
 	int		flags;
+	int 	dire;
 	const void	*pctrl;
 //	struct {
 //		unsigned LOCK:1;
@@ -62,10 +63,14 @@ typedef enum _type2{
 } type2_t;
 
 
-#define O_NOACCESS	00
-#define O_RDONLY	01
-#define O_WRONLY	02
-//#define O_RDWR	03
+#define DB_N 	0	/** 无访问 */
+#define DB_R	1	/** 只读 */
+#define DB_RW	2	/** 读写 */
+#define DB_A	3	/** 追加 */
+
+#define DIRE_CUR	0 /* 访问后指针不变 */
+#define DIRE_BACK	-1 /* 访问后指针往后移动 */
+#define DIRE_FOR	1 /* 访问后指针往前移动 */
 
 /* The possibilities for the third argument to `fseek'.
    These values should not be changed.  */
@@ -73,16 +78,20 @@ typedef enum _type2{
 #define SEEK_CUR	1	/* Seek from current position.  */
 #define SEEK_END	2	/* Seek from end of file.  */
 
+#ifndef EOF
+# define EOF (-1)
+#endif
+
 void db_init(void);
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...);
 bool db_close(Queue *pque);
 
-bool db_seek(Queue *pque, int sym);
+bool db_seek(Queue *pque, int ndata, int whence, int dire);
 Queue *db_locate(type1_t type1, type2_t type2, Db_time *ptime);
 
-bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
-bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
-//bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len);
+bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
+bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
+//bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
 
 
 #endif /* DB_H_ */

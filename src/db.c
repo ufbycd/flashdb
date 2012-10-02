@@ -108,18 +108,20 @@ void db_init(void)
 	Db_addr all, used;
 	float use_pec, kb;
 
-	_init();
-	_init_ques();
+	_init();	// 初始化硬件
+
+	debug("db info:\n");
+	debug("startAddr = %#08x\n", db.startAddr);
+	debug("endAddr   = %#08x\n", db.endAddr);
+	debug("earseSize = %#08x\n", db.earseSize);
+
+	_init_ques();	// 初始化队列
 
 	all = db.endAddr - db.startAddr + 1;
 	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr + 1;
 	use_pec = 100.0 * used / all;
 	kb = used / 1024.0;
 
-	debug("db info:\n");
-	debug("startAddr = %#08x\n", db.startAddr);
-	debug("endAddr   = %#08x\n", db.endAddr);
-	debug("earseSize = %#08x\n", db.earseSize);
 	debug("data used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
 }
 
@@ -182,7 +184,6 @@ static Queue *_get_que(Ctrl *pctrl)
  * @param type2
  * @param flags
  * @return
- * @todo	更改为类似于fopen的格式
  */
 Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 {
@@ -194,7 +195,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	assert(pctrl != NULL);
 
 #if MULTIPLE_READ
-	if(flags == O_RDONLY)
+	if(flags == DB_R)
 	{
 		pque = (Queue *)malloc(sizeof(Queue));
 		if(pque == NULL )
@@ -205,7 +206,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 		memcpy(pque, _get_que(pctrl), sizeof(Queue));
 		pque->flags = flags;
 	}
-	else if(flags == O_WRONLY)
+	else if(flags == DB_A)
 	{
 		pque = _get_que(pctrl);
 		pque->flags = flags;
@@ -229,12 +230,13 @@ bool db_close(Queue *pque)
 	assert(pque != NULL);
 
 #if MULTIPLE_READ
-	if(pque->flags == O_RDONLY)
+	if(pque->flags == DB_R)
 	{
 		/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
 		Queue *pmain_que = _get_que(pque->pctrl);
 		pmain_que->accessAddr = pque->accessAddr;
-		pmain_que->flags = O_NOACCESS;
+		pmain_que->flags = DB_N;
+		pmain_que->dire = 0;
 
 		free(pque);
 
@@ -242,7 +244,8 @@ bool db_close(Queue *pque)
 	}
 #endif
 
-	pque->flags = O_NOACCESS;
+	pque->flags = DB_N;
+	pque->dire = 0;
 
 	return true;
 }
@@ -373,7 +376,7 @@ static Db_child _get_child(Queue *pque)
 	pctrl = pque->pctrl;
 	if(pctrl->child_type2 != NONE2)
 	{
-		pchild_que = db_open(pctrl->type1, pctrl->child_type2, O_RDONLY);
+		pchild_que = db_open(pctrl->type1, pctrl->child_type2, DB_R);
 		assert(pchild_que != NULL);
 
 		child.startAddr = _get_next_addr(pchild_que, pchild_que->headAddr, -1);
@@ -397,14 +400,14 @@ static Db_child _get_child(Queue *pque)
  * @todo	验证写入的正确性
  * @todo	处理坏块
  */
-bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
+bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 {
 	Db_Info info;
 
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == pque->data_len);
-	assert(pque->flags == O_WRONLY);
+	assert(pque->flags == DB_A);
 
 	info.symbol = DATA_AVAIL;
 	info.time = *ptime;
@@ -427,7 +430,7 @@ bool db_append(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
  * @return
  * @todo	处理坏块
  */
-bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
+bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 {
 	Db_Info info;
 	uint8_t buf[data_len];
@@ -436,7 +439,7 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	assert(pque != NULL);
 //	assert(pdata != NULL);
 	assert(data_len == pque->data_len);
-	assert(pque->flags == O_RDONLY);
+	assert(pque->flags == DB_R);
 
 	if(pdata == NULL)
 		pdata = &buf;
@@ -453,7 +456,8 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
 	{
 		memcpy(ptime, &info.time, sizeof(Db_time));
 	}
-//	pque->readAddr = _get_next_addr(pque, -1);
+
+	pque->accessAddr = _get_next_addr(pque, pque->accessAddr, pque->dire);
 
 	return true;
 }
@@ -467,14 +471,14 @@ bool db_read(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
  * @return
  */
 #if 0
-bool db_write(Queue *pque, void *pdata, Db_time *ptime, size_t data_len)
+bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 {
 
 
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == pque->data_len);
-	assert(pque->flags == O_WRONLY);
+	assert(pque->flags == DB_A);
 
 
 
@@ -498,7 +502,7 @@ static bool _read_time(Queue *pque, Db_time *ptime)
 
 	data_len = _size_of_info(pque) + pque->data_len;
 
-	return db_read(pque, NULL, ptime, data_len);
+	return db_read(pque, NULL, data_len, ptime);
 }
 
 /** 移动队列访问指针
@@ -507,12 +511,50 @@ static bool _read_time(Queue *pque, Db_time *ptime)
  * @param sym
  * @return
  */
-bool db_seek(Queue *pque, int sym)
+bool db_seek(Queue *pque, int ndata, int whence, int dire)
 {
+	int ldire = 0;
+	Db_addr addr = 0x00;
+
+	switch (whence)
+	{
+		case SEEK_CUR:
+			addr = pque->accessAddr;
+			break;
+
+		case SEEK_SET:
+			addr = pque->headAddr;
+			break;
+
+		case SEEK_END:
+			debug("SEEK_END is not supported!\n");
+			return false;
+			break;
+
+		default:
+			debug("Seek error!\n");
+			break;
+	}
+
+	if(ndata > 0)
+		ldire = 1;
+	else if (ndata < 0)
+		ldire = -1;
+	else
+		ldire = 0;
+
+	while(ndata)
+	{
+		addr = _get_next_addr(pque, addr, ldire);
+		ndata -= ldire;
+	}
+
+	pque->accessAddr = addr;
+	pque->dire = dire;
 
 	assert(pque != NULL);
 
-	return 0;
+	return true;
 }
 
 /** 获取队列的子类数据的类型
@@ -605,15 +647,14 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 
 	assert(ptime != NULL);
 
-//	pctrl = get_ctrl_by_type(type1, YEAR);
-//	pque = _get_que(pctrl);
 	next_type2 = YEAR;
 	do
 	{
 		locate_type2 = next_type2;
-		pque = db_open(type1, locate_type2, O_RDONLY);
-		if(pque == NULL )
-			return NULL ;
+		pque = db_open(type1, locate_type2, DB_R);
+		assert(pque != NULL);
+
+		db_seek(pque, 0, SEEK_SET, -1);
 
 		match = FALSE;
 		while(1)
@@ -626,9 +667,6 @@ Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
 				match = TRUE;
 				break;
 			}
-
-			if(db_seek(pque, -1) == EOF)
-				break;
 		}
 
 		if(match && locate_type2 == type2)
@@ -727,12 +765,14 @@ static bool _init_ques(void)
 		pque->headAddr = _find_queue_head(pque);
 		pque->accessAddr = pque->headAddr;
 		pque->data_len = ctrls[i].data_len;
-		pque->flags = O_NOACCESS;
+		pque->flags = DB_N;
+		pque->dire = 0;
 
 		if(pque->endAddr > db.endAddr)
 		{
 			debug("DB Init Error: Out of range!\n");
 			stat = false;
+			break;
 		}
 
 		addr = pque->endAddr + 1;

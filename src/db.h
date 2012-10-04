@@ -52,8 +52,7 @@ typedef enum _type1{
 
 typedef enum _type2{
 	NONE2,
-	SEC,
-	MIN,
+	MINUS,
 	HOUR,
 	DAY,
 	WEEK,
@@ -75,7 +74,7 @@ typedef enum _type2{
    These values should not be changed.  */
 #define SEEK_SET	0	/* Seek from beginning of file.  */
 #define SEEK_CUR	1	/* Seek from current position.  */
-#define SEEK_END	2	/* Seek from end of file.  */
+//#define SEEK_END	2	/* Seek from end of file.  */
 
 #ifndef EOF
 # define EOF (-1)
@@ -86,7 +85,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...);
 bool db_close(Queue *pque);
 
 bool db_seek(Queue *pque, int ndata, int whence, int dire);
-Queue *db_locate(type1_t type1, type2_t type2, Db_time *ptime);
+bool db_locate(Queue *pque, Db_time *plocate_time, int deep);
 
 bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
 bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);

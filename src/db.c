@@ -78,8 +78,8 @@ typedef struct _Test_Data
 } Test_data;
 
 static Ctrl ctrls[] = {
-		{ TEST, MIN, 	NONE1,	sizeof(Test_data), MINUS_NUM, 0},
-		{ TEST, DAY, 	MIN,	sizeof(Test_data), DAY_NUM,	1},
+		{ TEST, MINUS, 	NONE1,	sizeof(Test_data), MINUS_NUM, 0},
+		{ TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
 		{ TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
 		{ TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
 		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
@@ -207,15 +207,18 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 
 		memcpy(pque, _get_que(pctrl), sizeof(Queue));
 		pque->flags = flags;
+		pque->dire = 0;
 	}
 	else if(flags == DB_A)
 	{
 		pque = _get_que(pctrl);
 		pque->flags = flags;
+		pque->dire = 0;
 	}
 #else
 	pque = _get_que(pctrl);
 	pque->flags = flags;
+	pque->dire = 0;
 #endif
 
 	return pque;
@@ -252,11 +255,36 @@ bool db_close(Queue *pque)
 	return true;
 }
 
+/** 以复制队列结构的方式打开队列
+ *
+ * @param pque_buf
+ * @param type1
+ * @param type2
+ * @param flags
+ * @return
+ * @note	以复制方式打开的队列无需调用 db_close 来关闭
+ */
+bool _open_by_copy(Queue *pque_buf, type1_t type1, type2_t type2, int flags, ...)
+{
+	Ctrl *pctrl;
+
+	pctrl = _get_ctrl(type1, type2);
+	if(pctrl == NULL)
+		return false;
+
+	memcpy(pque_buf, _get_que(pctrl), sizeof(Queue));
+	pque_buf->flags = flags;
+	pque_buf->dire = 0;
+
+	return true;
+}
+
 /** 判断队列是否有子类数据
  *
  * @param pque
  * @return
  */
+#if 0
 static bool _have_child(Queue *pque)
 {
 	Ctrl *pctrl;
@@ -269,6 +297,7 @@ static bool _have_child(Queue *pque)
 
 	return true;
 }
+#endif
 
 /** 获取队列的info结构的长度
  *
@@ -277,15 +306,29 @@ static bool _have_child(Queue *pque)
  */
 static size_t _info_len(Queue *pque)
 {
+	Ctrl *pctrl;
 	Db_Info info;
+	size_t len = 0;
 
 	assert(pque != NULL);
 
-	if(_have_child(pque))
-		return sizeof(info);
+	pctrl = pque->pctrl;
+
+	if(pctrl->type2 == MINUS)
+	{
+		len =  sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time.min)
+				+ sizeof(info.time.hour) + sizeof(info.time.day);
+	}
+	else if(pctrl->child_type2 == NONE2)
+	{
+		len = sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time);
+	}
 	else
-		return sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time.min)
-		        + sizeof(info.time.hour);
+	{
+		len = sizeof(info);
+	}
+
+	return len;
 }
 
 /** 获取客户数据的长度
@@ -309,7 +352,7 @@ static size_t _data_len(Queue *pque)
  * @param pque
  * @return
  */
-static size_t _db_data_len(Queue *pque)
+static size_t _info_data_len(Queue *pque)
 {
 	Ctrl *pctrl;
 
@@ -369,7 +412,7 @@ static Db_addr _get_next_addr(Queue *pque, Db_addr curAddr, int dire)
 
 	assert(pque != NULL);
 
-	len = _db_data_len(pque);
+	len = _info_data_len(pque);
 	area_len = pque->endAddr - pque->startAddr;
 
 	if(dire > 0)
@@ -403,18 +446,18 @@ static Db_child _get_child(Queue *pque)
 {
 	Db_child child;
 	Ctrl *pctrl;
-	Queue *pchild_que;
+	Queue child_que;
+	bool res;
 
 	assert(pque != NULL);
 
 	pctrl = pque->pctrl;
 	if(pctrl->child_type2 != NONE2)
 	{
-		pchild_que = db_open(pctrl->type1, pctrl->child_type2, DB_R);
-		assert(pchild_que != NULL);
+		res = _open_by_copy(&child_que, pctrl->type1, pctrl->child_type2, DB_R);
+		assert(res == true);
 
-		child.startAddr = _get_next_addr(pchild_que, pchild_que->headAddr, -1);
-		db_close(pchild_que);
+		child.startAddr = _get_next_addr(&child_que, child_que.headAddr, -1);
 	}
 	else
 	{
@@ -442,6 +485,8 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pdata != NULL);
 	assert(data_len == _data_len(pque));
 	assert(pque->flags == DB_A);
+	assert(pque->headAddr >= pque->startAddr);
+	assert(pque->headAddr < pque->endAddr);
 
 	info.symbol = DATA_AVAIL;
 	info.time = *ptime;
@@ -472,8 +517,11 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 //	assert(pdata != NULL);
-	assert(data_len == _data_len(pque));
 	assert(pque->flags == DB_R);
+	if(pdata)
+		assert(data_len == _data_len(pque));
+	assert(pque->accessAddr >= pque->startAddr);
+	assert(pque->accessAddr < pque->endAddr);
 
 	if(pdata == NULL)
 		pdata = &buf;
@@ -527,6 +575,7 @@ bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
  * @return 成功为true,否则为false
  * @todo  处理坏块
  */
+#if 0
 static bool _read_time(Queue *pque, Db_time *ptime)
 {
 	assert(pque != NULL);
@@ -534,7 +583,23 @@ static bool _read_time(Queue *pque, Db_time *ptime)
 
 	return db_read(pque, NULL, _data_len(pque), ptime);
 }
+#endif
 
+/** 读取当前位置的info结构
+ *
+ * @param pque
+ * @param pinfo
+ * @return
+ */
+static bool _read_info(Queue *pque, Db_Info *pinfo)
+{
+	assert(pque != NULL);
+	assert(pinfo != NULL);
+	assert(pque->accessAddr >= pque->startAddr);
+	assert(pque->accessAddr < pque->endAddr);
+
+	return _read(pque->accessAddr, pinfo, sizeof(Db_Info));
+}
 /** 移动队列访问指针
  *
  * @param pque
@@ -547,6 +612,8 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 	int ldire = 0;
 	Db_addr addr = 0x00;
 
+	assert(pque != NULL);
+
 	switch (whence)
 	{
 		case SEEK_CUR:
@@ -554,7 +621,7 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 			break;
 
 		case SEEK_SET:
-			addr = pque->headAddr;
+			addr = _get_next_addr(pque, pque->headAddr, -1);
 			break;
 
 		case SEEK_END:
@@ -583,8 +650,6 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 	pque->accessAddr = addr;
 	pque->dire = dire;
 
-	assert(pque != NULL);
-
 	return true;
 }
 
@@ -593,7 +658,8 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
  * @param pque
  * @return
  */
-static type2_t _get_child_type(Queue *pque)
+#if 0
+static type2_t _get_child_type2(Queue *pque)
 {
 	Ctrl *pctrl;
 
@@ -603,6 +669,49 @@ static type2_t _get_child_type(Queue *pque)
 
 	return pctrl->child_type2;
 }
+#endif
+
+/** 判断队列是否有父类数据
+ *
+ * @param pctrl
+ * @return
+ */
+static bool _have_parent(Ctrl *pctrl)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_LENG(ctrls); ++i)
+	{
+		if(ctrls[i].type1 != pctrl->type1)
+			continue;
+
+		if(ctrls[i].child_type2 == pctrl->type2)
+			return true;
+	}
+
+	return false;
+}
+
+/** 获取队列的父类数据的类型
+ *
+ * @param pctrl
+ * @return
+ */
+static type2_t _get_parent_type2(Ctrl *pctrl)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_LENG(ctrls); ++i)
+	{
+		if(ctrls[i].type1 != pctrl->type1)
+			continue;
+
+		if(ctrls[i].child_type2 == pctrl->type2)
+			return ctrls[i].type2;
+	}
+
+	return NONE2;
+}
 
 /** 判断给定数据类型上的两时间是否相同
  *
@@ -611,113 +720,133 @@ static type2_t _get_child_type(Queue *pque)
  * @param type2
  * @return
  */
-static bool _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
+static int _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 {
-	bool stat = false;
+	union {
+		uint64_t v;
+		Db_time  t;
+	} t1, t2;
+	int dv, res;
 
 	assert(pt1 != NULL);
 	assert(pt2 != NULL);
 
+	t1.v = 0;
+	t2.v = 0;
 	switch (type2)
 	{
-		case YEAR:
-			if(pt1->year == pt2->year)
-				stat = true;
-			break;
-
-		case MONTH:
-			if(pt1->year == pt2->year &&
-					pt1->month == pt2->month)
-				stat = true;
-			break;
-
-		case WEEK:
-			if(pt1->year == pt2->year &&
-					pt1->weeks == pt2->weeks)
-				stat = true;
-			break;
-
+		case MINUS:
+			t1.t.min = pt1->min;
+			t2.t.min = pt2->min;
+			/* no break */
+		case HOUR:
+			t1.t.hour = pt1->hour;
+			t1.t.hour = pt1->hour;
+			/* no break */
 		case DAY:
-			if(pt1->year == pt2->year &&
-					pt1->month == pt2->month &&
-					pt1->day == pt2->day)
-				stat = true;
-			break;
-
-		case MIN:
-			if(pt1->year == pt2->year &&
-					pt1->month == pt2->month &&
-					pt1->day == pt2->day &&
-					pt1->hour == pt2->hour &&
-					pt1->min == pt2->min)
-				stat = true;
+			t1.t.day = pt1->day;
+			t2.t.day = pt2->day;
+			/* no break */
+		case WEEK:
+			t1.t.weeks = pt1->weeks;
+			t2.t.weeks = pt2->weeks;
+			/* no break */
+		case MONTH:
+			t1.t.month = pt1->month;
+			t2.t.month = pt2->month;
+			/* no break */
+		case YEAR:
+			t1.t.year = pt1->year;
+			t2.t.year = pt2->year;
 			break;
 
 		default:
 			debug("Wrong Type2: %d\n", type2);
+			return -1;
 			break;
 	}
 
-	return stat;
+	dv = t1.v - t2.v;
+	if(dv == 0)
+		res = 0;
+	else if(dv > 0)
+		res = 1;
+	else
+		res = -1;
+
+	return res;
 }
 
 /** 定位某类型的数据在队列中的某时间点上的位置
  *
- * @param type1
- * @param type2
- * @param ptime
+ * @param pque
+ * @param plocate_time
+ * @param deep
  * @return
- * @todo	区分周数据的定位
  */
-Queue * db_locate(type1_t type1, type2_t type2, Db_time *ptime)
+bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 {
-	Queue *pque;
-	type2_t locate_type2, next_type2;
+	Ctrl *pctrl = NULL;
 	Db_time rtime;
+	Db_addr locateAddr, curAddr;
+	int dire;
 	bool match;
+	int res;
 
-	assert(ptime != NULL);
+	assert(pque != NULL);
+	assert(plocate_time!= NULL);
 
-	next_type2 = YEAR;
-	do
+	pctrl = pque->pctrl;
+	curAddr = pque->accessAddr;
+	dire = pque->dire;
+
+	if(deep && _have_parent(pctrl))
 	{
-		locate_type2 = next_type2;
-		pque = db_open(type1, locate_type2, DB_R);
-		assert(pque != NULL);
+		Queue parent_que;
+		Db_Info info;
 
+		if(!_open_by_copy(&parent_que, pctrl->type1, _get_parent_type2(pctrl), DB_R))
+			return false;
+
+		if(!db_locate(&parent_que, plocate_time, deep - 1))
+			return false;
+
+		if(!_read_info(&parent_que, &info))
+			return false;
+
+		pque->accessAddr = info.child.startAddr;
+		pque->dire = 1;
+	}
+	else
+	{
 		db_seek(pque, 0, SEEK_SET, -1);
+	}
 
-		match = FALSE;
-		while(1)
+	match = false;
+	while(1)
+	{
+		locateAddr = pque->accessAddr;
+
+		if(!db_read(pque, NULL, 0, &rtime))
+			break;
+
+		res = _time_match(pctrl->type2, &rtime, plocate_time);
+		if(res == 0)
 		{
-			if(_read_time(pque, &rtime) < 0)
-				break;
-
-			if(_time_match(locate_type2, ptime, &rtime))
-			{
-				match = TRUE;
-				break;
-			}
+			match = true;
+			curAddr = locateAddr;
+			break;
 		}
-
-		if(match && locate_type2 == type2)
+		else if(res * pque->dire > 0)	// 若已超过给定时间，则无需再继续搜索
 		{
-			return pque;
+			break;
 		}
-		else if(match)
-		{
-			next_type2 = _get_child_type(pque);
-			db_close(pque);
-		}
-		else
-		{
-			db_close(pque);
-			return NULL ;
-		}
+	}
 
-	} while(locate_type2 != type2);
+	pque->dire = dire;
+	pque->accessAddr = curAddr;
 
-	return NULL ;
+	return match;
 }
 
 /** 找出队列的头部
@@ -735,7 +864,7 @@ static Db_addr _find_queue_head(Queue *pque)
 	
 	assert(pque != NULL);
 
-	db_data_len = _db_data_len(pque);
+	db_data_len = _info_data_len(pque);
 	
 	findAddr = pque->startAddr;
 	symbol = 0x00;

@@ -746,6 +746,8 @@ static int _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 		case DAY:
 			t1.t.day = pt1->day;
 			t2.t.day = pt2->day;
+			if(type2 == MINUS)	// 分钟数据只有分、时和天的时间
+				break;
 			/* no break */
 		case WEEK:
 			t1.t.weeks = pt1->weeks;

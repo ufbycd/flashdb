@@ -827,7 +827,7 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 	{
 		locateAddr = pque->accessAddr;
 
-		if(!db_read(pque, NULL, 0, &rtime))
+		if(!db_read(pque, NULL, _data_len(pque), &rtime))
 			break;
 
 		res = _time_match(pctrl->type2, &rtime, plocate_time);

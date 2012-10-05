@@ -19,7 +19,7 @@
 #define NEED_ENCRYPT 1
 
 #if NEED_ENCRYPT
-#	define ENCRYPT(a) (a ^ 0x55)
+#	define ENCRYPT(a) ((a) ^ 0x55)
 #else
 #	define ENCRYPT(a) (a)
 #endif
@@ -114,7 +114,7 @@ void db_init(void)
 	debug("startAddr = %#08x\n", db.startAddr);
 	debug("endAddr   = %#08x\n", db.endAddr);
 	debug("earseSize = %#08x\n", db.earseSize);
-	debug("Sizeof ques[] = %lu\n", sizeof(ques));
+	debug("Sizeof ques[] = %u\n", sizeof(ques));
 
 	_init_ques();	// 初始化队列
 
@@ -835,7 +835,7 @@ static void _encrypt(void *dst, void *src, size_t len)
 	assert(src != NULL);
 
 	for(i = 0; i < len; i++)
-		pd[i] = ps[i] ^ 0x55;
+		pd[i] = ENCRYPT(ps[i]);
 }
 
 /** 数据解密

@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/// 是否精简分钟数据的info结构的内容
+#define SIMPLIFY_MINUS_INFO 0
 /// 是否支持对同一队列同时有多个read open
 #define MULTIPLE_READ 0
 /// 是否在地址递变时执行地址修正
@@ -49,7 +51,7 @@ static const struct
 
 typedef struct _Db_child
 {
-	Db_addr startAddr;
+	Db_addr endAddr;
 } Db_child;
 
 typedef struct _Db_Info
@@ -314,12 +316,15 @@ static size_t _info_len(Queue *pque)
 
 	pctrl = pque->pctrl;
 
+#if SIMPLIFY_MINUS_INFO
 	if(pctrl->type2 == MINUS)
 	{
 		len =  sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time.min)
-				+ sizeof(info.time.hour) + sizeof(info.time.day);
+				+ sizeof(info.time.hour);
 	}
-	else if(pctrl->child_type2 == NONE2)
+	else
+#endif
+	if(pctrl->child_type2 == NONE2)
 	{
 		len = sizeof(info.symbol) + sizeof(info.checksum) + sizeof(info.time);
 	}
@@ -457,11 +462,11 @@ static Db_child _get_child(Queue *pque)
 		res = _open_by_copy(&child_que, pctrl->type1, pctrl->child_type2, DB_R);
 		assert(res == true);
 
-		child.startAddr = _get_next_addr(&child_que, child_que.headAddr, -1);
+		child.endAddr = _get_next_addr(&child_que, child_que.headAddr, -1);
 	}
 	else
 	{
-		child.startAddr = 0x00;
+		child.endAddr = 0x00;
 	}
 
 	return child;
@@ -742,12 +747,14 @@ static int _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 		case HOUR:
 			t1.t.hour = pt1->hour;
 			t1.t.hour = pt1->hour;
+#if SIMPLIFY_MINUS_INFO
+			if(type2 == MINUS)	// 分钟数据只有分、时的时间
+				break;
+#endif
 			/* no break */
 		case DAY:
 			t1.t.day = pt1->day;
 			t2.t.day = pt2->day;
-			if(type2 == MINUS)	// 分钟数据只有分、时和天的时间
-				break;
 			/* no break */
 		case WEEK:
 			t1.t.weeks = pt1->weeks;
@@ -816,8 +823,8 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 		if(!_read_info(&parent_que, &info))
 			return false;
 
-		pque->accessAddr = info.child.startAddr;
-		pque->dire = 1;
+		pque->accessAddr = info.child.endAddr;
+		pque->dire = -1;
 	}
 	else
 	{
@@ -925,7 +932,7 @@ static bool _init_ques(void)
 		debug("Address: [%#08x, %#08x]\n", pque->startAddr, pque->endAddr);
 
 		pque->headAddr = _find_queue_head(pque);
-		pque->accessAddr = pque->headAddr;
+		pque->accessAddr = _get_next_addr(pque, pque->headAddr, -1);
 		pque->flags = DB_N;
 		pque->dire = 0;
 

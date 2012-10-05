@@ -480,7 +480,7 @@ static Db_child _get_child(Queue *pque)
  * @param len
  * @return
  * @todo	验证写入的正确性
- * @todo	处理坏块
+ * @todo	处理数据被意外损坏的情况
  */
 bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 {
@@ -512,7 +512,9 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
  * @param pdata
  * @param len
  * @return
- * @todo	处理坏块
+ * @todo	处理数据被意外损坏的情况
+ * @todo	若分钟数据的info结构被精简，则从其对应的日数据中获取完整的时间信息
+ * @todo	若上述todo不能实现，则在分钟数据的info结构中添加界定标志以区分不同日的分钟数据
  */
 bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 {
@@ -578,7 +580,7 @@ bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
  * @param pque	队列
  * @param ptime	时间输出
  * @return 成功为true,否则为false
- * @todo  处理坏块
+ * @todo  处理数据被意外损坏的情况
  */
 #if 0
 static bool _read_time(Queue *pque, Db_time *ptime)
@@ -610,7 +612,7 @@ static bool _read_info(Queue *pque, Db_Info *pinfo)
  * @param pque
  * @param sym
  * @return
- * @todo	要定位到队列的尾，需要在队列结构中添加尾指针成员
+ * @note	要定位到队列的尾，需要在队列结构中添加尾指针成员
  */
 bool db_seek(Queue *pque, int ndata, int whence, int dire)
 {
@@ -792,6 +794,7 @@ static int _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
  * @param plocate_time
  * @param deep
  * @return
+ * @todo	返回实现定位到数据类型
  */
 bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 {
@@ -862,22 +865,21 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
  *
  * @param pque
  * @return
- * @todo 确认整个头部为空的
  */
 static Db_addr _find_queue_head(Queue *pque)
 {
-	size_t db_data_len;
+	size_t info_data_len;
 	Db_addr  findAddr;
 	uint8_t symbol;
 	bool found = false;
 	
 	assert(pque != NULL);
 
-	db_data_len = _info_data_len(pque);
+	info_data_len = _info_data_len(pque);
 	
 	findAddr = pque->startAddr;
 	symbol = 0x00;
-	while((findAddr + db_data_len) < pque->endAddr)
+	while((findAddr + info_data_len) < pque->endAddr)
 	{
 		_read(findAddr + FPOS(Db_Info, symbol), &symbol, sizeof(symbol));  //只读取数据的标识
 		if(symbol == DATA_NAN)	//如果是空数据，说明找到了最新数据，即头
@@ -886,7 +888,7 @@ static Db_addr _find_queue_head(Queue *pque)
 			break;
 		}
 		
-		findAddr += db_data_len;
+		findAddr += info_data_len;
 	}
 	
 	if(!found)
@@ -905,7 +907,7 @@ static bool _init_ques(void)
 {
 	Db_addr addr, left;
 	Queue *pque;
-	size_t datas_len;	// 所有 info信息 + 待存储数据 长度之和
+	size_t info_datas_len;	// 所有 info信息 + 待存储数据 长度之和
 	size_t que_len;			// 队列所需的长度
 	int i;
 	bool stat = true;
@@ -925,8 +927,8 @@ static bool _init_ques(void)
 		pque->pctrl = &ctrls[i];
 
 		pque->startAddr = addr;
-		datas_len = (_info_len(pque) + ctrls[i].data_len) * ctrls[i].max_num;
-		que_len = ( 2 + datas_len / db.earseSize) * db.earseSize;
+		info_datas_len = _info_data_len(pque) * ctrls[i].max_num;
+		que_len = ( 2 + info_datas_len / db.earseSize) * db.earseSize;	// 确保队列的长度为擦除大小的整数倍
 		pque->endAddr = pque->startAddr + que_len - 1;
 
 		debug("Address: [%#08x, %#08x]\n", pque->startAddr, pque->endAddr);

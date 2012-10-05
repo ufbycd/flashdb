@@ -116,7 +116,11 @@ void db_init(void)
 	debug("startAddr = %#08x\n", db.startAddr);
 	debug("endAddr   = %#08x\n", db.endAddr);
 	debug("earseSize = %#08x\n", db.earseSize);
+#ifdef __x86_64__
+	debug("Sizeof ques[] = %lu\n", sizeof(ques));
+#else
 	debug("Sizeof ques[] = %u\n", sizeof(ques));
+#endif
 
 	_init_ques();	// 初始化队列
 

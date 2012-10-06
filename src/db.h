@@ -66,7 +66,7 @@ typedef enum _type2{
 #define DB_N 	0	/** 无访问 */
 #define DB_R	1	/** 只读 */
 #define DB_RW	2	/** 读写 */
-#define DB_A	3	/** 追加 */
+#define DB_RA	3	/** 追加 */
 
 #define DIRE_CUR	0 /* 访问后指针不变 */
 #define DIRE_BACK	-1 /* 访问后指针往后移动 */

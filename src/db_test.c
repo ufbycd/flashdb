@@ -10,6 +10,11 @@
 #include "lcut/lcut.h"
 #include <string.h>
 
+void testQuesInit(lcut_tc_t *tc, void *data)
+{
+
+}
+
 void testOpen(lcut_tc_t *tc, void *data)
 {
 	Queue *pque;
@@ -28,13 +33,52 @@ void testOpen(lcut_tc_t *tc, void *data)
 		LCUT_ASSERT(tc, pque != NULL);
 		db_close(pque);
 
-		pque = db_open(TEST, type2, DB_A);
+		pque = db_open(TEST, type2, DB_RA);
 		LCUT_ASSERT(tc, pque != NULL);
 		db_close(pque);
 	}
 
 	pque = db_open(TEST, NONE2, DB_R);
 	LCUT_ASSERT(tc, pque == NULL);
+
+	pque = db_open(NONE1, MINUS, DB_R);
+	LCUT_ASSERT(tc, pque == NULL);
+}
+
+void testSeek(lcut_tc_t *tc, void *data)
+{
+	Queue *pque;
+	type2_t type2;
+	const type2_t type2s[] = {MINUS, DAY, WEEK, MONTH};
+	Db_addr addr;
+
+	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	{
+		type2 = type2s[i];
+
+		pque = db_open(TEST, type2, DB_R);
+		LCUT_ASSERT(tc, pque != NULL);
+
+		pque->accessAddr = 0x00;
+		db_seek(pque, 0, SEEK_SET, 0);
+		addr = pque->accessAddr;
+		LCUT_ASSERT(tc, addr >= pque->startAddr && addr < pque->endAddr);
+
+		db_seek(pque, 100, SEEK_CUR, 0);
+		LCUT_ASSERT(tc, addr >= pque->startAddr && addr < pque->endAddr);
+
+		db_seek(pque, -100, SEEK_CUR, 0);
+		LCUT_ASSERT(tc, pque->accessAddr == addr);
+
+		db_seek(pque, 0, SEEK_CUR, 0);
+		LCUT_ASSERT(tc, pque->accessAddr == addr);
+
+		db_seek(pque, 1, SEEK_CUR, 0);
+		LCUT_ASSERT(tc, pque->accessAddr == pque->headAddr);
+
+		db_close(pque);
+	}
+
 }
 
 void testAppend(lcut_tc_t *tc, void *data)
@@ -44,7 +88,7 @@ void testAppend(lcut_tc_t *tc, void *data)
 	Test_data d = {0}, rd;
 	int i;
 
-	pque = db_open(TEST, MINUS, DB_A);
+	pque = db_open(TEST, MINUS, DB_RA);
 	LCUT_ASSERT(tc, pque != NULL);
 
 	LCUT_ASSERT(tc, db_seek(pque, 1, SEEK_SET, 1));
@@ -64,15 +108,40 @@ void testAppend(lcut_tc_t *tc, void *data)
 	db_close(pque);
 }
 
+void testLocate(lcut_tc_t *tc, void *data)
+{
+
+}
+
+void testAppendToNotEmptySpace(lcut_tc_t *tc, void *data)
+{
+
+}
+
+void testBrokenData(lcut_tc_t *tc, void *data)
+{
+
+}
+
+
+
 void test_db(void)
 {
     lcut_ts_t   *suite = NULL;
 
     LCUT_TEST_BEGIN("database test", NULL, NULL);
 
-    LCUT_TS_INIT(suite, "database", NULL, NULL);
+    LCUT_TS_INIT(suite, "Database - Normal Test", NULL, NULL);
+    LCUT_TC_ADD(suite, testQuesInit, NULL, NULL, NULL);
     LCUT_TC_ADD(suite, testOpen, NULL, NULL, NULL);
+    LCUT_TC_ADD(suite, testSeek, NULL, NULL, NULL);
     LCUT_TC_ADD(suite, testAppend, NULL, NULL, NULL);
+    LCUT_TC_ADD(suite, testLocate, NULL, NULL, NULL);
+    LCUT_TS_ADD(suite);
+
+    LCUT_TS_INIT(suite, "Database - Limit Test", NULL, NULL);
+    LCUT_TC_ADD(suite, testAppendToNotEmptySpace, NULL, NULL, NULL);
+    LCUT_TC_ADD(suite, testBrokenData, NULL, NULL, NULL);
     LCUT_TS_ADD(suite);
 
     LCUT_TEST_RUN();

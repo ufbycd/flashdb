@@ -75,7 +75,7 @@ typedef const struct
 } Ctrl;
 
 static Ctrl ctrls[] = {
-		{TEST, MINUS, 	NONE1,	sizeof(Test_data), MINUS_NUM, 0},
+		{TEST, MINUS, 	NONE1,	sizeof(Test_data), 48 * 2, 0},
 		{TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
 		{TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
 		{TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
@@ -210,7 +210,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 		pque->flags = flags;
 		pque->dire = 0;
 	}
-	else if(flags == DB_A)
+	else if(flags == DB_RA)
 	{
 		pque = _get_que(pctrl);
 		pque->flags = flags;
@@ -484,11 +484,12 @@ static Db_child _get_child(Queue *pque)
 bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 {
 	Db_Info info;
+	bool stat;
 
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == _data_len(pque));
-	assert(pque->flags == DB_A);
+	assert(pque->flags == DB_RA);
 	assert(pque->headAddr >= pque->startAddr);
 	assert(pque->headAddr < pque->endAddr);
 
@@ -497,12 +498,12 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
-	_write(pque->headAddr, &info, _info_len(pque));
-	_write(pque->headAddr + _info_len(pque), pdata, data_len);
+	stat = _write(pque->headAddr, &info, _info_len(pque));
+	stat &=_write(pque->headAddr + _info_len(pque), pdata, data_len);
 
 	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
 
-	return true;
+	return stat;
 }
 
 /** 随机读取数据
@@ -547,7 +548,7 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	pque->accessAddr = _get_next_addr(pque, pque->accessAddr, pque->dire);
 
-	return true;
+	return stat;
 }
 
 /** 随机写入数据
@@ -566,7 +567,7 @@ bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == pque->data_len);
-	assert(pque->flags == DB_A);
+	assert(pque->flags == DB_RA);
 
 
 

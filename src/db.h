@@ -11,10 +11,12 @@
 #include "system.h"
 #include <time.h>
 
-typedef enum _Db_err{
-	DB_OK  = 1,
-	DB_ERR = 0,
-}Db_err;
+
+typedef struct _Test_Data
+{
+	uint32_t val;
+} Test_data;
+
 
 typedef struct _Db_time{
 	int8_t		min;

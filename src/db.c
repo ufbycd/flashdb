@@ -74,17 +74,12 @@ typedef const struct
 	int		que_index;
 } Ctrl;
 
-typedef struct _Test_Data
-{
-	uint32_t val[4];
-} Test_data;
-
 static Ctrl ctrls[] = {
-		{ TEST, MINUS, 	NONE1,	sizeof(Test_data), MINUS_NUM, 0},
-		{ TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
-		{ TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
-		{ TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
-		{ TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
+		{TEST, MINUS, 	NONE1,	sizeof(Test_data), MINUS_NUM, 0},
+		{TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
+		{TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
+		{TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
+		{TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
 };
 
 static Queue ques[ARRAY_LENG(ctrls)];

@@ -70,7 +70,7 @@ extern "C"
 \t\033[32mGREEN BAR!\033[0m\n\
 ==========================\n"
 #else
-#	define FAILURE_TIP_FMT "\tCase '%s': Failed\n\t\t%s:%d: Function %s, %s\n\n"
+#	define FAILURE_TIP_FMT "\tCase '%s': Failed\n\t\t%s:%d: %s\n"
 #	define REDBAR ""
 #	define GREENBAR ""
 #endif
@@ -187,7 +187,7 @@ void lcut_test_report(lcut_test_t *test);
  * f -- test case function
  * e -- extra parameter
  */
-#define LCUT_TC_ADD(p, s, f, e, before, after) do { \
+#define LCUT_TC_ADD(p, f, e, before, after) do { \
         if ((_cut_status = lcut_tc_add((p), (#f), (f), (e), (before), (after))) != 0) { \
             printf("[LCUT]: test case add failed!, errcode[%d]\n", _cut_status); \
             exit(1); \
@@ -245,8 +245,8 @@ void lcut_true(lcut_tc_t *tc, int condition, int lineno, const char *fcname, con
         lcut_str_nequal(tc, expected, actual, __LINE__, __FUNCTION__, __FILE__); \
     } while(0)
 
-#define LCUT_ASSERT(tc, msg, condition) do { \
-        lcut_assert(tc, msg, (condition), __LINE__, __FUNCTION__, __FILE__); \
+#define LCUT_ASSERT(tc, condition) do { \
+        lcut_assert(tc, #condition, (condition), __LINE__, __FUNCTION__, __FILE__); \
     } while(0)
 
 #define LCUT_TRUE(tc, condition) do { \

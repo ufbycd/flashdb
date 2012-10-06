@@ -139,7 +139,7 @@ int lcut_test_init(lcut_test_t **test, const char *title, fixture_func setup, fi
 	int rv = 0;
 	lcut_test_t *p = NULL;
 
-	p = malloc(sizeof(*p));
+	p = malloc(sizeof(lcut_test_t));
 	if(p == NULL )
 	{
 		rv = errno;
@@ -322,8 +322,7 @@ void lcut_test_run(lcut_test_t *test, int *result)
 					else if(tc->status == TEST_CASE_FAILURE)
 					{
 						ts->failed++;
-						PRINTF(FAILURE_TIP_FMT, tc->desc, tc->fname,
-								tc->line, tc->fcname, tc->reason);
+						PRINTF(FAILURE_TIP_FMT, tc->desc, tc->fname, tc->line, tc->reason);
 						(*result) = TEST_CASE_FAILURE;
 					}
 				}
@@ -360,7 +359,7 @@ void lcut_test_report(lcut_test_t *test)
 		}
 	}
 	PRINTF("\nSummary: \n");
-	PRINTF("\tSuite\tCase\n");
+	PRINTF("\t\tSuite\tCase\n");
 	PRINTF("\tTotal:\t%d\t%d\n", test->suites, test->cases);
 	PRINTF("\tFailed:\t%d\t%d\n", failed_suites, failed_cases);
 //	PRINTF("\tTotal Suites: %d \n", test->suites);

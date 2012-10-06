@@ -194,8 +194,8 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	Queue *pque = NULL;
 
 	pctrl = _get_ctrl(type1, type2);
-
-	assert(pctrl != NULL);
+	if(pctrl == NULL)
+		return NULL;
 
 #if MULTIPLE_READ
 	if(flags == DB_R)
@@ -523,7 +523,7 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 //	assert(pdata != NULL);
-	assert(pque->flags == DB_R);
+//	assert(pque->flags == DB_R);
 	if(pdata)
 		assert(data_len == _data_len(pque));
 	assert(pque->accessAddr >= pque->startAddr);

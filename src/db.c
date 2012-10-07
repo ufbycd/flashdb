@@ -734,13 +734,15 @@ static type2_t _get_parent_type2(Ctrl *pctrl)
 int db_time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 {
 	union {
-		uint64_t v;
+		int64_t v;
 		Db_time  t;
 	} t1, t2;
-	int dv, res;
+	int64_t dv;
+	int res;
 
 	assert(pt1 != NULL);
 	assert(pt2 != NULL);
+	assert(type2 >= MINUS && type2 <= YEAR);
 
 	t1.v = 0;
 	t2.v = 0;
@@ -752,7 +754,7 @@ int db_time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 			/* no break */
 		case HOUR:
 			t1.t.hour = pt1->hour;
-			t1.t.hour = pt1->hour;
+			t2.t.hour = pt2->hour;
 #if SIMPLIFY_MINUS_INFO
 			if(type2 == MINUS)	// 分钟数据只有分、时的时间
 				break;

@@ -44,7 +44,7 @@ typedef struct _queue {
 }Queue;
 
 typedef enum _type1{
-	NONE1,
+	NONE1 = 0,
 	TEST,
 	ELEC,
 	GEN,
@@ -53,7 +53,7 @@ typedef enum _type1{
 }type1_t;
 
 typedef enum _type2{
-	NONE2,
+	NONE2 = 0,
 	MINUS,
 	HOUR,
 	DAY,

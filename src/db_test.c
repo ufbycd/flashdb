@@ -158,11 +158,10 @@ void testAppend(lcut_tc_t *tc, void *data)
 		memset(&rd, 0xffff, sizeof(rd));
 		memset(&rt, 0xffff, sizeof(rt));
 		LCUT_ASSERT(tc, db_read(pque, &rd, sizeof(rd), &rt));
+		LCUT_ASSERT(tc, pque->accessAddr != accessAddr);
 
 		LCUT_INT_EQUAL(tc, 0, memcmp(&rd, &d, sizeof(rd)));
 		LCUT_INT_EQUAL(tc, 0, memcmp(&rt, &t, sizeof(rt)));
-
-		LCUT_ASSERT(tc, pque->accessAddr != accessAddr);
 	}
 
 	LCUT_ASSERT(tc, db_close(pque));
@@ -170,7 +169,27 @@ void testAppend(lcut_tc_t *tc, void *data)
 
 void testTimeMatch(lcut_tc_t *tc, void *data)
 {
+	union {
+		Db_time t;
+		int8_t b[sizeof(Db_time)];
+	}t1, t2;
+	type2_t type2;
 
+	memset(&t1, 1, sizeof(t1));
+	memset(&t2, 1, sizeof(t2));
+	for (type2 = MINUS; type2 <= YEAR; type2++)
+	{
+		memset(&t1, 1, sizeof(t1));
+		LCUT_INT_EQUAL(tc, 0, db_time_match(type2, &t1.t, &t2.t));
+
+		t1.b[type2 - 1] = 2;
+		LCUT_INT_EQUAL(tc, 1, db_time_match(type2, &t1.t, &t2.t));
+		LCUT_INT_EQUAL(tc, -1, db_time_match(type2, &t2.t, &t1.t));
+		if(type2 < YEAR)
+		{
+			LCUT_INT_EQUAL(tc, 0, db_time_match(type2 + 1, &t1.t, &t2.t));
+		}
+	}
 }
 
 void testLocate(lcut_tc_t *tc, void *data)

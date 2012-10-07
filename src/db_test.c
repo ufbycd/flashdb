@@ -20,8 +20,9 @@ void testOpen(lcut_tc_t *tc, void *data)
 	Queue *pque;
 	type2_t type2;
 	const type2_t type2s[] = {MINUS, DAY, WEEK, MONTH};
+	int i;
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -51,8 +52,9 @@ void testSeek(lcut_tc_t *tc, void *data)
 	type2_t type2;
 	const type2_t type2s[] = {MINUS, DAY, WEEK, MONTH};
 	Db_addr addr;
+	int i;
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 

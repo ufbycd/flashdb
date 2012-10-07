@@ -457,6 +457,7 @@ static lcut_symbol_t* lookup_symbol(const char *symbol_name, int obj_type)
 static void add_value(lcut_symbol_t *s, void *value, int count)
 {
 	lcut_value_t *v = NULL;
+	int i;
 
 	/*
 	 * make the obj always to return one same value
@@ -471,7 +472,7 @@ static void add_value(lcut_symbol_t *s, void *value, int count)
 
 	s->always_return_flag = 0;
 
-	for(int i = 0; i < count; i++)
+	for(i = 0; i < count; i++)
 	{
 		errno = 0;
 		v = (lcut_value_t*) malloc(sizeof(*v));

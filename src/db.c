@@ -45,9 +45,11 @@ const struct
 	Db_addr startAddr;
 	Db_addr endAddr;
 	Db_addr earseSize;
+	Db_addr earseMask;
 } db = {.startAddr = 0x0155,
 		.endAddr   = 0xfeff,
-		.earseSize = EARSE_SIZE
+		.earseSize = EARSE_SIZE,
+		.earseMask = EARSE_SIZE - 1,
 };
 
 typedef struct _Db_child
@@ -499,10 +501,10 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
+	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
+
 	stat = _write(pque->headAddr, &info, _info_len(pque));
 	stat &=_write(pque->headAddr + _info_len(pque), pdata, data_len);
-
-	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
 
 	return stat;
 }
@@ -630,7 +632,7 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 			break;
 
 		case SEEK_SET:
-			addr = _get_next_addr(pque, pque->headAddr, -1);
+			addr = pque->headAddr;
 			break;
 
 		case SEEK_END:
@@ -896,6 +898,8 @@ static Db_addr _find_queue_head(Queue *pque)
 	if(!found)
 		findAddr = pque->startAddr;
 	
+	findAddr = _get_next_addr(pque, findAddr, -1);
+
 	debug("Head: %#08x\n", findAddr);
 
 	return findAddr;
@@ -936,7 +940,7 @@ static bool _init_ques(void)
 		debug("Address: [%#08x, %#08x]\n", pque->startAddr, pque->endAddr);
 
 		pque->headAddr = _find_queue_head(pque);
-		pque->accessAddr = _get_next_addr(pque, pque->headAddr, -1);
+		pque->accessAddr = pque->headAddr;
 		pque->flags = DB_N;
 		pque->dire = 0;
 
@@ -1035,4 +1039,46 @@ static bool _read(Db_addr addr, void *pdata, size_t len)
 #else
 	return flash_read(addr, pdata, len);
 #endif
+}
+
+/** 擦除队列中的数据
+ *
+ * @param pque
+ * @return
+ */
+bool db_erase(Queue *pque)
+{
+	uint8_t d;
+	Db_addr addr;
+
+	assert(pque != NULL);
+
+	d  = DECRYPT(0xff);
+	for (addr = pque->startAddr; addr < pque->endAddr; addr += db.earseSize)
+	{
+		if(!_write(addr, &d, sizeof(d)))
+			return false;
+	}
+
+	pque->headAddr = _get_next_addr(pque, pque->startAddr, -1);
+	pque->accessAddr = pque->headAddr;
+
+	return true;
+}
+
+/** 擦除所有队列的数据
+ *
+ * @return
+ */
+bool db_erase_all(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_LENG(ques); ++i)
+	{
+		if(!db_erase(&ques[i]))
+			return false;
+	}
+
+	return true;
 }

@@ -43,7 +43,6 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		headAddrs[i] = pque->headAddr;
 		LCUT_ASSERT(tc, db_append(pque, &d, sizeof(d), &t));
 
-
 		LCUT_ASSERT(tc, db_close(pque));
 	}
 
@@ -57,7 +56,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		LCUT_ASSERT(tc, pque != NULL);
 
 		LCUT_ASSERT(tc, pque->headAddr != headAddrs[i]);
-		db_seek(pque, 0, SEEK_SET, 0);
+		db_seek(pque, -1, SEEK_SET, 0);
 		LCUT_ASSERT(tc, pque->accessAddr == headAddrs[i]);
 
 		LCUT_ASSERT(tc, db_close(pque));
@@ -90,9 +89,6 @@ void testOpen(lcut_tc_t *tc, void *data)
 		LCUT_ASSERT(tc, db_close(pque));
 	}
 
-	pque = db_open(TEST, NONE2, DB_R);
-	LCUT_ASSERT(tc, pque == NULL);
-
 	pque = db_open(NONE1, MINUS, DB_R);
 	LCUT_ASSERT(tc, pque == NULL);
 }
@@ -113,7 +109,9 @@ void testSeek(lcut_tc_t *tc, void *data)
 
 		pque->accessAddr = 0x00;
 		db_seek(pque, 0, SEEK_SET, 0);
+
 		addr = pque->accessAddr;
+		LCUT_ASSERT(tc, addr == pque->headAddr);
 		LCUT_ASSERT(tc, addr >= pque->startAddr && addr < pque->endAddr);
 
 		db_seek(pque, 123, SEEK_CUR, 0);
@@ -124,9 +122,6 @@ void testSeek(lcut_tc_t *tc, void *data)
 
 		db_seek(pque, 0, SEEK_CUR, 0);
 		LCUT_ASSERT(tc, pque->accessAddr == addr);
-
-		db_seek(pque, 1, SEEK_CUR, 0);
-		LCUT_ASSERT(tc, pque->accessAddr == pque->headAddr);
 
 		LCUT_ASSERT(tc, db_close(pque));
 	}

@@ -12,6 +12,7 @@
 #include <string.h>
 
 /// 是否精简分钟数据的info结构的内容
+/// @todo 分钟数据的info结构被精简后，目前还没有简洁而完善的读取分钟数据的方法
 #define SIMPLIFY_MINUS_INFO 0
 /// 是否支持对同一队列同时有多个read open
 #define MULTIPLE_READ 0
@@ -39,7 +40,7 @@
 #define MINUS_NUM	(DAY_NUM * 48)
 
 /// @todo 提供擦除的掩码值,以优化地址递变和擦除的判断
-static const struct
+const struct
 {
 	Db_addr startAddr;
 	Db_addr endAddr;
@@ -524,7 +525,7 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 //	assert(pdata != NULL);
-//	assert(pque->flags == DB_R);
+	assert(pque->flags != DB_N);
 	if(pdata)
 		assert(data_len == _data_len(pque));
 	assert(pque->accessAddr >= pque->startAddr);
@@ -620,6 +621,7 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 	Db_addr addr = 0x00;
 
 	assert(pque != NULL);
+	assert(pque->flags != DB_N);
 
 	switch (whence)
 	{
@@ -727,7 +729,7 @@ static type2_t _get_parent_type2(Ctrl *pctrl)
  * @param type2
  * @return
  */
-static int _time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
+int db_time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
 {
 	union {
 		uint64_t v;
@@ -842,7 +844,7 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 		if(!db_read(pque, NULL, _data_len(pque), &rtime))
 			break;
 
-		res = _time_match(pctrl->type2, &rtime, plocate_time);
+		res = db_time_match(pctrl->type2, &rtime, plocate_time);
 		if(res == 0)
 		{
 			match = true;

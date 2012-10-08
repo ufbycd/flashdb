@@ -18,6 +18,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 	Db_addr headAddrs[ARRAY_LENG(type2s)];
 	Test_data d = {0};
 	Db_time t = {0};
+	int i;
 
 	extern const struct
 	{
@@ -26,7 +27,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		Db_addr earseSize;
 	} db;
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -48,7 +49,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 
 	db_init();	// 重新初始化
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -68,8 +69,9 @@ void testOpen(lcut_tc_t *tc, void *data)
 	Queue *pque;
 	type2_t type2;
 	const type2_t type2s[] = {MINUS, DAY, WEEK, MONTH};
+	int i;
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -99,8 +101,9 @@ void testSeek(lcut_tc_t *tc, void *data)
 	type2_t type2;
 	const type2_t type2s[] = {MINUS, DAY, WEEK, MONTH};
 	Db_addr addr;
+	int i;
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 

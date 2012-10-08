@@ -528,8 +528,8 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 //	assert(pdata != NULL);
 	assert(pque->flags != DB_N);
-	if(pdata)
-		assert(data_len == _data_len(pque));
+//	if(pdata)
+	assert(data_len == _data_len(pque));
 	assert(pque->accessAddr >= pque->startAddr);
 	assert(pque->accessAddr < pque->endAddr);
 

@@ -18,6 +18,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 	Db_addr headAddrs[ARRAY_LENG(type2s)];
 	Test_data d = {0};
 	Db_time t = {0};
+	int i;
 
 	extern const struct
 	{
@@ -26,7 +27,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		Db_addr earseSize;
 	} db;
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -48,7 +49,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 
 	db_init();	// 重新初始化
 
-	for (int i = 0; i < ARRAY_LENG(type2s); ++i)
+	for (i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -196,7 +197,34 @@ void testTimeMatch(lcut_tc_t *tc, void *data)
 
 void testLocate(lcut_tc_t *tc, void *data)
 {
+	Queue *pminus_que, *pday_que;
+	Test_data d = {0};
+	Db_time tt, t = {30, 23, 31, 44, 10, 12};
 
+	pminus_que = db_open(TEST, MINUS, DB_RA);
+	LCUT_ASSERT(tc, pminus_que != NULL);
+	pday_que = db_open(TEST, DAY, DB_RA);
+	LCUT_ASSERT(tc, pday_que != NULL);
+
+	LCUT_ASSERT(tc, db_erase(pminus_que));
+	LCUT_ASSERT(tc, db_erase(pday_que));
+
+	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &t));
+	LCUT_ASSERT(tc, db_append(pday_que, &d, sizeof(d), &t));
+
+	memcpy(&tt, &t, sizeof(tt));
+	tt.month = 11;
+	tt.day = 1;
+	tt.hour = 0;
+	tt.min = 0;
+	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &tt));
+
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 0));
+	LCUT_INT_EQUAL(tc, DAY, db_locate(pday_que, &t, 0));
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 1));
+
+	db_close(pminus_que);
+	db_close(pday_que);
 }
 
 void testAppendToNotEmptySpace(lcut_tc_t *tc, void *data)

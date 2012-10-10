@@ -464,7 +464,7 @@ static Db_child _get_child(Queue *pque)
 		res = _open_by_copy(&child_que, pctrl->type1, pctrl->child_type2, DB_R);
 		assert(res == true);
 
-		child.endAddr = _get_next_addr(&child_que, child_que.headAddr, -1);
+		child.endAddr = child_que.headAddr;
 	}
 	else
 	{
@@ -528,8 +528,7 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 //	assert(pdata != NULL);
 	assert(pque->flags != DB_N);
-	if(pdata)
-		assert(data_len == _data_len(pque));
+	assert(data_len == _data_len(pque));
 	assert(pque->accessAddr >= pque->startAddr);
 	assert(pque->accessAddr < pque->endAddr);
 
@@ -802,13 +801,14 @@ int db_time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
  * @return
  * @todo	返回实现定位到数据类型
  */
-bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
+type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep)
 {
 	Ctrl *pctrl = NULL;
 	Db_time rtime;
 	Db_addr locateAddr, curAddr;
 	int dire;
-	bool match;
+//	bool match;
+	type2_t located_type2 = NONE2;
 	int res;
 
 	assert(pque != NULL);
@@ -822,11 +822,13 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 	{
 		Queue parent_que;
 		Db_Info info;
+		type2_t parent_type2;
 
-		if(!_open_by_copy(&parent_que, pctrl->type1, _get_parent_type2(pctrl), DB_R))
+		parent_type2 = _get_parent_type2(pctrl);
+		if(!_open_by_copy(&parent_que, pctrl->type1, parent_type2, DB_R))
 			return false;
 
-		if(!db_locate(&parent_que, plocate_time, deep - 1))
+		if(db_locate(&parent_que, plocate_time, deep - 1) != parent_type2)
 			return false;
 
 		if(!_read_info(&parent_que, &info))
@@ -834,13 +836,14 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 
 		pque->accessAddr = info.child.endAddr;
 		pque->dire = -1;
+		located_type2 = parent_type2;
 	}
 	else
 	{
 		db_seek(pque, 0, SEEK_SET, -1);
 	}
 
-	match = false;
+//	match = false;
 	while(1)
 	{
 		locateAddr = pque->accessAddr;
@@ -851,8 +854,9 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 		res = db_time_match(pctrl->type2, &rtime, plocate_time);
 		if(res == 0)
 		{
-			match = true;
+//			match = true;
 			curAddr = locateAddr;
+			located_type2 = pctrl->type2;
 			break;
 		}
 		else if(res * pque->dire > 0)	// 若已超过给定时间，则无需再继续搜索
@@ -864,7 +868,7 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 	pque->dire = dire;
 	pque->accessAddr = curAddr;
 
-	return match;
+	return located_type2;
 }
 
 /** 找出队列的头部
@@ -1054,6 +1058,7 @@ bool db_erase(Queue *pque)
 	Db_addr addr;
 
 	assert(pque != NULL);
+	assert(pque->flags != DB_N && pque->flags != DB_R);
 
 	d  = DECRYPT(0xff);
 	for (addr = pque->startAddr; addr < pque->endAddr; addr += db.earseSize)

@@ -87,7 +87,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...);
 bool db_close(Queue *pque);
 
 bool db_seek(Queue *pque, int ndata, int whence, int dire);
-bool db_locate(Queue *pque, Db_time *plocate_time, int deep);
+type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep);
 
 bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
 bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);

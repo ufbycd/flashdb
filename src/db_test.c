@@ -199,7 +199,8 @@ void testLocate(lcut_tc_t *tc, void *data)
 {
 	Queue *pminus_que, *pday_que;
 	Test_data d = {0};
-	Db_time tt, t = {30, 23, 31, 44, 10, 12};
+	Db_time t = {30, 23, 31, 44, 10, 12},
+			tt = {00, 00, 01, 44, 11, 12};
 
 	pminus_que = db_open(TEST, MINUS, DB_RA);
 	LCUT_ASSERT(tc, pminus_que != NULL);
@@ -209,14 +210,11 @@ void testLocate(lcut_tc_t *tc, void *data)
 	LCUT_ASSERT(tc, db_erase(pminus_que));
 	LCUT_ASSERT(tc, db_erase(pday_que));
 
+	LCUT_INT_EQUAL(tc, NONE2, db_locate(pminus_que, &t, 0));
+	LCUT_INT_EQUAL(tc, NONE2, db_locate(pday_que, &t, 0));
+
 	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &t));
 	LCUT_ASSERT(tc, db_append(pday_que, &d, sizeof(d), &t));
-
-	memcpy(&tt, &t, sizeof(tt));
-	tt.month = 11;
-	tt.day = 1;
-	tt.hour = 0;
-	tt.min = 0;
 	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &tt));
 
 	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 0));

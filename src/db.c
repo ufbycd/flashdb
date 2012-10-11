@@ -496,9 +496,12 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == _data_len(pque));
-	assert(pque->flags == DB_RA);
+	assert(pque->flags & DB_A);
 	assert(pque->headAddr >= pque->startAddr);
 	assert(pque->headAddr < pque->endAddr);
+
+	if(!(pque->flags & DB_A))
+		return false;
 
 	info.symbol = DATA_AVAIL;
 	info.time = *ptime;
@@ -531,10 +534,13 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 //	assert(pdata != NULL);
-	assert(pque->flags != DB_N);
+	assert(pque->flags & DB_R);
 	assert(data_len == _data_len(pque));
 	assert(pque->accessAddr >= pque->startAddr);
 	assert(pque->accessAddr < pque->endAddr);
+
+	if(!(pque->flags & DB_R))
+		return false;
 
 	if(pdata == NULL)
 		pdata = &buf;
@@ -573,7 +579,10 @@ bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == pque->data_len);
-	assert(pque->flags == DB_RA);
+	assert(pque->flags & DB_W);
+
+	if(!(pque->flags & DB_W))
+		return false;
 
 
 
@@ -626,7 +635,10 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 	Db_addr addr = 0x00;
 
 	assert(pque != NULL);
-	assert(pque->flags != DB_N);
+	assert(pque->flags & DB_R);
+
+	if(!(pque->flags & DB_R))
+		return false;
 
 	switch (whence)
 	{
@@ -1062,7 +1074,10 @@ bool db_erase(Queue *pque)
 	Db_addr addr;
 
 	assert(pque != NULL);
-	assert(pque->flags != DB_N && pque->flags != DB_R);
+	assert((pque->flags & DB_W) || (pque->flags & DB_A));
+
+	if(!((pque->flags & DB_W) || (pque->flags & DB_A)))
+		return false;
 
 	d  = DECRYPT(0xff);
 	for (addr = pque->startAddr; addr < pque->endAddr; addr += db.earseSize)

@@ -16,7 +16,6 @@ extern void test_db(void);
 
 int main(int argc, char **argv)
 {
-	puts("!!!Hello World!!!"); /* prints !!!Hello ARM World!!! */
 
 	db_init();
 	test_db();

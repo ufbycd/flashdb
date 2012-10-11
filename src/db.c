@@ -87,7 +87,7 @@ static Ctrl ctrls[] = {
 
 static Queue ques[ARRAY_LENG(ctrls)];
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define debug(fmt, args...) printf(fmt, ##args)
 #else
@@ -105,8 +105,6 @@ static size_t _info_len(Queue *pque);
  */
 void db_init(void)
 {
-	Db_addr all, used;
-	float use_pec, kb;
 
 	_init();	// 初始化硬件
 
@@ -122,12 +120,18 @@ void db_init(void)
 
 	_init_ques();	// 初始化队列
 
+
+#if DEBUG
+	Db_addr all, used;
+	float use_pec, kb;
+
 	all = db.endAddr - db.startAddr + 1;
 	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr + 1;
 	use_pec = 100.0 * used / all;
 	kb = used / 1024.0;
 
 	debug("data used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
+#endif
 }
 
 /** 获取某数据对应的控制快

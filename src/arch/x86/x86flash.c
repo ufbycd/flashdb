@@ -32,7 +32,7 @@ const flash_t flash = {
 
 static const char *x86flash = "flash.bin";
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 	#define debug(fmt, args...) printf(fmt, ##args)
 #else

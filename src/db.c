@@ -15,9 +15,9 @@
 /// @todo 分钟数据的info结构被精简后，目前还没有简洁而完善的读取分钟数据的方法
 #define SIMPLIFY_MINUS_INFO 0
 /// 是否支持对同一队列同时有多个read open
-#define MULTIPLE_READ 0
+#define MULTIPLE_OPEN 1
 /// 是否在地址递变时执行地址修正
-#define DO_CORRECT_ADDRESS 0
+#define DO_CORRECT_ADDRESS 1
 /// 是否需要加密数据
 #define NEED_ENCRYPT 1
 
@@ -204,25 +204,14 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	if(pctrl == NULL)
 		return NULL;
 
-#if MULTIPLE_READ
-	if(flags == DB_R)
-	{
-		pque = (Queue *)malloc(sizeof(Queue));
-		if(pque == NULL )
-		{
-			return NULL ;
-		}
+#if MULTIPLE_OPEN
+	pque = (Queue *)malloc(sizeof(Queue));
+	if(pque == NULL )
+		return NULL;
 
-		memcpy(pque, _get_que(pctrl), sizeof(Queue));
-		pque->flags = flags;
-		pque->dire = 0;
-	}
-	else if(flags == DB_RA)
-	{
-		pque = _get_que(pctrl);
-		pque->flags = flags;
-		pque->dire = 0;
-	}
+	memcpy(pque, _get_que(pctrl), sizeof(Queue));
+	pque->flags = flags;
+	pque->dire = 0;
 #else
 	pque = _get_que(pctrl);
 	pque->flags = flags;
@@ -242,23 +231,18 @@ bool db_close(Queue *pque)
 
 	assert(pque != NULL);
 
-#if MULTIPLE_READ
-	if(pque->flags == DB_R)
-	{
-		/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
-		Queue *pmain_que = _get_que(pque->pctrl);
-		pmain_que->accessAddr = pque->accessAddr;
-		pmain_que->flags = DB_N;
-		pmain_que->dire = 0;
+#if MULTIPLE_OPEN
+	/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
+	Queue *pmain_que = _get_que(pque->pctrl);
+	pmain_que->accessAddr = pque->accessAddr;
+	pmain_que->flags = DB_N;
+	pmain_que->dire = 0;
 
-		free(pque);
-
-		return true;
-	}
-#endif
-
+	free(pque);
+#else
 	pque->flags = DB_N;
 	pque->dire = 0;
+#endif
 
 	return true;
 }
@@ -508,10 +492,20 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
+#if MULTIPLE_OPEN
+	Queue *pmain_que = _get_que((Ctrl *)pque->pctrl);
+
+	pque->headAddr = pmain_que->headAddr;
+#endif
+
 	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
 
 	stat = _write(pque->headAddr, &info, _info_len(pque));
 	stat &=_write(pque->headAddr + _info_len(pque), pdata, data_len);
+
+#if MULTIPLE_OPEN
+	pmain_que->headAddr = pque->headAddr;
+#endif
 
 	return stat;
 }

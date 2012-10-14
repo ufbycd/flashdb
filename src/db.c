@@ -11,10 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "db_elec.h"
+
 /// 是否精简分钟数据的info结构的内容
 /// @todo 分钟数据的info结构被精简后，目前还没有简洁而完善的读取分钟数据的方法
 #define SIMPLIFY_MINUS_INFO 0
-/// 是否支持对同一队列同时有多个read open
+/// 是否支持对同一队列同时有多个互不影响的open
 #define MULTIPLE_OPEN 1
 /// 是否在地址递变时执行地址修正
 #define DO_CORRECT_ADDRESS 1
@@ -74,15 +76,22 @@ typedef const struct
 	size_t data_len;
 	int max_num;
 //	Queue *pque;
-	int		que_index;
+	int		index;
 } Ctrl;
 
 static Ctrl ctrls[] = {
-		{TEST, MINUS, 	NONE1,	sizeof(Test_data), 48 * 2, 0},
+		{TEST, MINUS, 	NONE2,	sizeof(Test_data), 48 * 2, 	0},
 		{TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
 		{TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
 		{TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
 		{TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
+
+		{ELEC, MINUS,	NONE2,	sizeof(Elec_data), MINUS_NUM, 5},
+		{ELEC, DAY,		MINUS,	sizeof(Elec_data), DAY_NUM, 	6},
+		{ELEC, WEEK,	DAY,	sizeof(Elec_data), WEEK_NUM, 	7},
+		{ELEC, MONTH,	DAY,	sizeof(Elec_data), MONTH_NUM, 8},
+		{ELEC, YEAR,	MONTH,	sizeof(Elec_data), YEAR_NUM,  9},
+
 };
 
 static Queue ques[ARRAY_LENG(ctrls)];
@@ -182,7 +191,7 @@ static Queue *_get_que(Ctrl *pctrl)
 	}
 	return NULL;
 #else
-	return &ques[pctrl->que_index];
+	return &ques[pctrl->index];
 #endif
 
 }
@@ -493,7 +502,7 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
 #if MULTIPLE_OPEN
-	Queue *pmain_que = _get_que((Ctrl *)pque->pctrl);
+	Queue *pmain_que = _get_que(pque->pctrl);
 
 	pque->headAddr = pmain_que->headAddr;
 #endif
@@ -629,9 +638,9 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 	Db_addr addr = 0x00;
 
 	assert(pque != NULL);
-	assert(pque->flags & DB_R);
+	assert((pque->flags & DB_R) || (pque->flags & DB_W));
 
-	if(!(pque->flags & DB_R))
+	if(!((pque->flags & DB_R) || (pque->flags & DB_W)))
 		return false;
 
 	switch (whence)
@@ -740,7 +749,7 @@ static type2_t _get_parent_type2(Ctrl *pctrl)
  * @param type2
  * @return
  */
-int db_time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
+int db_time_cmp(type2_t type2, Db_time *pt1, Db_time *pt2)
 {
 	union {
 		int64_t v;
@@ -861,7 +870,7 @@ type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep)
 		if(!db_read(pque, NULL, _data_len(pque), &rtime))
 			break;
 
-		res = db_time_match(pctrl->type2, &rtime, plocate_time);
+		res = db_time_cmp(pctrl->type2, &rtime, plocate_time);
 		if(res == 0)
 		{
 //			match = true;
@@ -960,6 +969,7 @@ static bool _init_ques(void)
 		pque->flags = DB_N;
 		pque->dire = 0;
 
+		assert(pque->endAddr <= db.endAddr);
 		if(pque->endAddr > db.endAddr)
 		{
 			debug("DB Init Error: Out of range!\n");

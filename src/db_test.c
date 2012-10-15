@@ -183,14 +183,14 @@ void testTimeMatch(lcut_tc_t *tc, void *data)
 	for (type2 = MINUS; type2 <= YEAR; type2++)
 	{
 		memset(&t1, 1, sizeof(t1));
-		LCUT_INT_EQUAL(tc, 0, db_time_match(type2, &t1.t, &t2.t));
+		LCUT_INT_EQUAL(tc, 0, db_time_cmp(type2, &t1.t, &t2.t));
 
 		t1.b[type2 - 1] = 2;
-		LCUT_INT_EQUAL(tc, 1, db_time_match(type2, &t1.t, &t2.t));
-		LCUT_INT_EQUAL(tc, -1, db_time_match(type2, &t2.t, &t1.t));
+		LCUT_INT_EQUAL(tc, 1, db_time_cmp(type2, &t1.t, &t2.t));
+		LCUT_INT_EQUAL(tc, -1, db_time_cmp(type2, &t2.t, &t1.t));
 		if(type2 < YEAR)
 		{
-			LCUT_INT_EQUAL(tc, 0, db_time_match(type2 + 1, &t1.t, &t2.t));
+			LCUT_INT_EQUAL(tc, 0, db_time_cmp(type2 + 1, &t1.t, &t2.t));
 		}
 	}
 }

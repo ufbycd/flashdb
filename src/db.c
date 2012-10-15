@@ -731,7 +731,7 @@ static type2_t _get_parent_type2(Ctrl *pctrl)
  * @param type2
  * @return
  */
-int db_time_match(type2_t type2, Db_time *pt1, Db_time *pt2)
+int db_time_cmp(type2_t type2, Db_time *pt1, Db_time *pt2)
 {
 	union {
 		int64_t v;
@@ -848,7 +848,7 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 		if(!db_read(pque, NULL, _data_len(pque), &rtime))
 			break;
 
-		res = db_time_match(pctrl->type2, &rtime, plocate_time);
+		res = db_time_cmp(pctrl->type2, &rtime, plocate_time);
 		if(res == 0)
 		{
 			match = true;

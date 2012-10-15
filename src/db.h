@@ -63,10 +63,10 @@ typedef enum _type2{
 } type2_t;
 
 
-#define DB_N 	0	/** 无访问 */
-#define DB_R	1	/** 只读 */
-#define DB_RW	2	/** 读写 */
-#define DB_RA	3	/** 追加 */
+#define DB_N 	(0u)			/** 无访问 */
+#define DB_R	(1u)			/** 读 */
+#define DB_W	(1u << 1)	/** 写 */
+#define DB_A	(1u << 2)	/** 追加 */
 
 #define DIRE_CUR	0 /* 访问后指针不变 */
 #define DIRE_BACK	-1 /* 访问后指针往后移动 */
@@ -87,7 +87,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...);
 bool db_close(Queue *pque);
 
 bool db_seek(Queue *pque, int ndata, int whence, int dire);
-bool db_locate(Queue *pque, Db_time *plocate_time, int deep);
+type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep);
 
 bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
 bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);

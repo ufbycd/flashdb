@@ -11,13 +11,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "db_elec.h"
+
 /// 是否精简分钟数据的info结构的内容
 /// @todo 分钟数据的info结构被精简后，目前还没有简洁而完善的读取分钟数据的方法
 #define SIMPLIFY_MINUS_INFO 0
-/// 是否支持对同一队列同时有多个read open
-#define MULTIPLE_READ 0
+/// 是否支持对同一队列同时有多个互不影响的open
+#define MULTIPLE_OPEN 1
 /// 是否在地址递变时执行地址修正
-#define DO_CORRECT_ADDRESS 0
+#define DO_CORRECT_ADDRESS 1
 /// 是否需要加密数据
 #define NEED_ENCRYPT 1
 
@@ -74,20 +76,27 @@ typedef const struct
 	size_t data_len;
 	int max_num;
 //	Queue *pque;
-	int		que_index;
+	int		index;
 } Ctrl;
 
 static Ctrl ctrls[] = {
-		{TEST, MINUS, 	NONE1,	sizeof(Test_data), 48 * 2, 0},
+		{TEST, MINUS, 	NONE2,	sizeof(Test_data), 48 * 2, 	0},
 		{TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
 		{TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
 		{TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
 		{TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
+
+		{ELEC, MINUS,	NONE2,	sizeof(Elec_data), MINUS_NUM, 5},
+		{ELEC, DAY,		MINUS,	sizeof(Elec_data), DAY_NUM, 	6},
+		{ELEC, WEEK,	DAY,	sizeof(Elec_data), WEEK_NUM, 	7},
+		{ELEC, MONTH,	DAY,	sizeof(Elec_data), MONTH_NUM, 8},
+		{ELEC, YEAR,	MONTH,	sizeof(Elec_data), YEAR_NUM,  9},
+
 };
 
 static Queue ques[ARRAY_LENG(ctrls)];
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define debug(fmt, args...) printf(fmt, ##args)
 #else
@@ -105,8 +114,6 @@ static size_t _info_len(Queue *pque);
  */
 void db_init(void)
 {
-	Db_addr all, used;
-	float use_pec, kb;
 
 	_init();	// 初始化硬件
 
@@ -122,12 +129,18 @@ void db_init(void)
 
 	_init_ques();	// 初始化队列
 
+
+#if DEBUG
+	Db_addr all, used;
+	float use_pec, kb;
+
 	all = db.endAddr - db.startAddr + 1;
 	used = ques[ARRAY_LENG(ques) - 1].endAddr - ques[0].startAddr + 1;
 	use_pec = 100.0 * used / all;
 	kb = used / 1024.0;
 
 	debug("data used: %#08x / %#08x = %.2f%%, %.2fKB\n", used, all, use_pec, kb);
+#endif
 }
 
 /** 获取某数据对应的控制快
@@ -178,7 +191,7 @@ static Queue *_get_que(Ctrl *pctrl)
 	}
 	return NULL;
 #else
-	return &ques[pctrl->que_index];
+	return &ques[pctrl->index];
 #endif
 
 }
@@ -200,25 +213,14 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 	if(pctrl == NULL)
 		return NULL;
 
-#if MULTIPLE_READ
-	if(flags == DB_R)
-	{
-		pque = (Queue *)malloc(sizeof(Queue));
-		if(pque == NULL )
-		{
-			return NULL ;
-		}
+#if MULTIPLE_OPEN
+	pque = (Queue *)malloc(sizeof(Queue));
+	if(pque == NULL )
+		return NULL;
 
-		memcpy(pque, _get_que(pctrl), sizeof(Queue));
-		pque->flags = flags;
-		pque->dire = 0;
-	}
-	else if(flags == DB_RA)
-	{
-		pque = _get_que(pctrl);
-		pque->flags = flags;
-		pque->dire = 0;
-	}
+	memcpy(pque, _get_que(pctrl), sizeof(Queue));
+	pque->flags = flags;
+	pque->dire = 0;
 #else
 	pque = _get_que(pctrl);
 	pque->flags = flags;
@@ -238,23 +240,18 @@ bool db_close(Queue *pque)
 
 	assert(pque != NULL);
 
-#if MULTIPLE_READ
-	if(pque->flags == DB_R)
-	{
-		/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
-		Queue *pmain_que = _get_que(pque->pctrl);
-		pmain_que->accessAddr = pque->accessAddr;
-		pmain_que->flags = DB_N;
-		pmain_que->dire = 0;
+#if MULTIPLE_OPEN
+	/* 保存当前的读地址，以使下次打开时的读地址与当前的一致 */
+	Queue *pmain_que = _get_que(pque->pctrl);
+	pmain_que->accessAddr = pque->accessAddr;
+	pmain_que->flags = DB_N;
+	pmain_que->dire = 0;
 
-		free(pque);
-
-		return true;
-	}
-#endif
-
+	free(pque);
+#else
 	pque->flags = DB_N;
 	pque->dire = 0;
+#endif
 
 	return true;
 }
@@ -464,7 +461,7 @@ static Db_child _get_child(Queue *pque)
 		res = _open_by_copy(&child_que, pctrl->type1, pctrl->child_type2, DB_R);
 		assert(res == true);
 
-		child.endAddr = _get_next_addr(&child_que, child_que.headAddr, -1);
+		child.endAddr = child_que.headAddr;
 	}
 	else
 	{
@@ -492,19 +489,32 @@ bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == _data_len(pque));
-	assert(pque->flags == DB_RA);
+	assert(pque->flags & DB_A);
 	assert(pque->headAddr >= pque->startAddr);
 	assert(pque->headAddr < pque->endAddr);
+
+	if(!(pque->flags & DB_A))
+		return false;
 
 	info.symbol = DATA_AVAIL;
 	info.time = *ptime;
 	info.child = _get_child(pque);
 	info.checksum = _calc_checksum(pque, &info, pdata, data_len);
 
+#if MULTIPLE_OPEN
+	Queue *pmain_que = _get_que(pque->pctrl);
+
+	pque->headAddr = pmain_que->headAddr;
+#endif
+
 	pque->headAddr = _get_next_addr(pque, pque->headAddr, 1);
 
 	stat = _write(pque->headAddr, &info, _info_len(pque));
 	stat &=_write(pque->headAddr + _info_len(pque), pdata, data_len);
+
+#if MULTIPLE_OPEN
+	pmain_que->headAddr = pque->headAddr;
+#endif
 
 	return stat;
 }
@@ -527,11 +537,13 @@ bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 
 	assert(pque != NULL);
 //	assert(pdata != NULL);
-	assert(pque->flags != DB_N);
-//	if(pdata)
+	assert(pque->flags & DB_R);
 	assert(data_len == _data_len(pque));
 	assert(pque->accessAddr >= pque->startAddr);
 	assert(pque->accessAddr < pque->endAddr);
+
+	if(!(pque->flags & DB_R))
+		return false;
 
 	if(pdata == NULL)
 		pdata = &buf;
@@ -570,7 +582,10 @@ bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
 	assert(pque != NULL);
 	assert(pdata != NULL);
 	assert(data_len == pque->data_len);
-	assert(pque->flags == DB_RA);
+	assert(pque->flags & DB_W);
+
+	if(!(pque->flags & DB_W))
+		return false;
 
 
 
@@ -623,7 +638,10 @@ bool db_seek(Queue *pque, int ndata, int whence, int dire)
 	Db_addr addr = 0x00;
 
 	assert(pque != NULL);
-	assert(pque->flags != DB_N);
+	assert((pque->flags & DB_R) || (pque->flags & DB_W));
+
+	if(!((pque->flags & DB_R) || (pque->flags & DB_W)))
+		return false;
 
 	switch (whence)
 	{
@@ -802,13 +820,14 @@ int db_time_cmp(type2_t type2, Db_time *pt1, Db_time *pt2)
  * @return
  * @todo	返回实现定位到数据类型
  */
-bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
+type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep)
 {
 	Ctrl *pctrl = NULL;
 	Db_time rtime;
 	Db_addr locateAddr, curAddr;
 	int dire;
-	bool match;
+//	bool match;
+	type2_t located_type2 = NONE2;
 	int res;
 
 	assert(pque != NULL);
@@ -822,11 +841,13 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 	{
 		Queue parent_que;
 		Db_Info info;
+		type2_t parent_type2;
 
-		if(!_open_by_copy(&parent_que, pctrl->type1, _get_parent_type2(pctrl), DB_R))
+		parent_type2 = _get_parent_type2(pctrl);
+		if(!_open_by_copy(&parent_que, pctrl->type1, parent_type2, DB_R))
 			return false;
 
-		if(!db_locate(&parent_que, plocate_time, deep - 1))
+		if(db_locate(&parent_que, plocate_time, deep - 1) != parent_type2)
 			return false;
 
 		if(!_read_info(&parent_que, &info))
@@ -834,13 +855,14 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 
 		pque->accessAddr = info.child.endAddr;
 		pque->dire = -1;
+		located_type2 = parent_type2;
 	}
 	else
 	{
 		db_seek(pque, 0, SEEK_SET, -1);
 	}
 
-	match = false;
+//	match = false;
 	while(1)
 	{
 		locateAddr = pque->accessAddr;
@@ -851,8 +873,9 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 		res = db_time_cmp(pctrl->type2, &rtime, plocate_time);
 		if(res == 0)
 		{
-			match = true;
+//			match = true;
 			curAddr = locateAddr;
+			located_type2 = pctrl->type2;
 			break;
 		}
 		else if(res * pque->dire > 0)	// 若已超过给定时间，则无需再继续搜索
@@ -864,7 +887,7 @@ bool db_locate(Queue *pque, Db_time *plocate_time, int deep)
 	pque->dire = dire;
 	pque->accessAddr = curAddr;
 
-	return match;
+	return located_type2;
 }
 
 /** 找出队列的头部
@@ -946,6 +969,7 @@ static bool _init_ques(void)
 		pque->flags = DB_N;
 		pque->dire = 0;
 
+		assert(pque->endAddr <= db.endAddr);
 		if(pque->endAddr > db.endAddr)
 		{
 			debug("DB Init Error: Out of range!\n");
@@ -1054,6 +1078,10 @@ bool db_erase(Queue *pque)
 	Db_addr addr;
 
 	assert(pque != NULL);
+	assert((pque->flags & DB_W) || (pque->flags & DB_A));
+
+	if(!((pque->flags & DB_W) || (pque->flags & DB_A)))
+		return false;
 
 	d  = DECRYPT(0xff);
 	for (addr = pque->startAddr; addr < pque->endAddr; addr += db.earseSize)

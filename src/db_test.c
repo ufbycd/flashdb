@@ -31,7 +31,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 	{
 		type2 = type2s[i];
 
-		pque = db_open(TEST, type2, DB_RA);
+		pque = db_open(TEST, type2, DB_R | DB_A);
 		LCUT_ASSERT(tc, pque != NULL);
 
 		LCUT_ASSERT(tc, pque->startAddr >= db.startAddr && pque->startAddr < db.endAddr);
@@ -80,14 +80,14 @@ void testOpen(lcut_tc_t *tc, void *data)
 		LCUT_INT_EQUAL(tc, DB_R, pque->flags);
 		LCUT_ASSERT(tc, db_close(pque));
 
-		pque = db_open(TEST, type2, DB_RW);
+		pque = db_open(TEST, type2, DB_R | DB_W);
 		LCUT_ASSERT(tc, pque != NULL);
-		LCUT_INT_EQUAL(tc, DB_RW, pque->flags);
+		LCUT_INT_EQUAL(tc, DB_R | DB_W, pque->flags);
 		LCUT_ASSERT(tc, db_close(pque));
 
-		pque = db_open(TEST, type2, DB_RA);
+		pque = db_open(TEST, type2, DB_R | DB_A);
 		LCUT_ASSERT(tc, pque != NULL);
-		LCUT_INT_EQUAL(tc, DB_RA, pque->flags);
+		LCUT_INT_EQUAL(tc, DB_R | DB_A, pque->flags);
 		LCUT_ASSERT(tc, db_close(pque));
 	}
 
@@ -139,7 +139,7 @@ void testAppend(lcut_tc_t *tc, void *data)
 	Db_addr headAddr, accessAddr;
 	int i;
 
-	pque = db_open(TEST, MINUS, DB_RA);
+	pque = db_open(TEST, MINUS, DB_R | DB_A);
 	LCUT_ASSERT(tc, pque != NULL);
 
 	for (i = 0; i < 123; ++i)
@@ -170,7 +170,7 @@ void testAppend(lcut_tc_t *tc, void *data)
 	LCUT_ASSERT(tc, db_close(pque));
 }
 
-void testTimeMatch(lcut_tc_t *tc, void *data)
+void testTimeCmp(lcut_tc_t *tc, void *data)
 {
 	union {
 		Db_time t;
@@ -197,7 +197,32 @@ void testTimeMatch(lcut_tc_t *tc, void *data)
 
 void testLocate(lcut_tc_t *tc, void *data)
 {
+	Queue *pminus_que, *pday_que;
+	Test_data d = {0};
+	Db_time t = {30, 23, 31, 44, 10, 12},
+			tt = {00, 00, 01, 44, 11, 12};
 
+	pminus_que = db_open(TEST, MINUS, DB_R | DB_A);
+	LCUT_ASSERT(tc, pminus_que != NULL);
+	pday_que = db_open(TEST, DAY, DB_R | DB_A);
+	LCUT_ASSERT(tc, pday_que != NULL);
+
+	LCUT_ASSERT(tc, db_erase(pminus_que));
+	LCUT_ASSERT(tc, db_erase(pday_que));
+
+	LCUT_INT_EQUAL(tc, NONE2, db_locate(pminus_que, &t, 0));
+	LCUT_INT_EQUAL(tc, NONE2, db_locate(pday_que, &t, 0));
+
+	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &t));
+	LCUT_ASSERT(tc, db_append(pday_que, &d, sizeof(d), &t));
+	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &tt));
+
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 0));
+	LCUT_INT_EQUAL(tc, DAY, db_locate(pday_que, &t, 0));
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 1));
+
+	db_close(pminus_que);
+	db_close(pday_que);
 }
 
 void testAppendToNotEmptySpace(lcut_tc_t *tc, void *data)
@@ -223,7 +248,7 @@ void test_db(void)
     LCUT_TC_ADD(suite, testOpen, NULL, NULL, NULL);
     LCUT_TC_ADD(suite, testSeek, NULL, NULL, NULL);
     LCUT_TC_ADD(suite, testAppend, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testTimeMatch, NULL, NULL, NULL);
+    LCUT_TC_ADD(suite, testTimeCmp, NULL, NULL, NULL);
     LCUT_TC_ADD(suite, testLocate, NULL, NULL, NULL);
     LCUT_TS_ADD(suite);
 

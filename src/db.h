@@ -95,7 +95,7 @@ bool db_append(Queue *pque, const void *pdata, size_t data_len, const Db_time *p
 
 int db_time_cmp(type2_t type2, const Db_time *pt1, const Db_time *pt2);
 bool db_erase(Queue *pque);
-bool db_ereae_all(void);
+bool db_erase_all(void);
 
 
 #endif /* DB_H_ */

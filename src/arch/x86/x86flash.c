@@ -136,7 +136,7 @@ bool flash_test(void)
  * @param	len		 锟斤拷写锟斤拷锟斤拷莸某锟斤拷锟�
  * @return	锟斤拷锟斤拷确锟斤拷锟斤拷TRUE锟斤拷锟斤拷锟津返伙拷FALSE
  ******************************************************************/
-bool flash_write(uint32_t addr, void * const buf, uint32_t len)
+bool flash_write(uint32_t addr, const void *buf, uint32_t len)
 {
 	FILE *wf;
 

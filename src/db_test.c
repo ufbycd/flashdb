@@ -27,15 +27,18 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		Db_addr earseSize;
 	} db;
 
-	for (i = 0; i < ARRAY_LENG(type2s); ++i)
+	for(i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
 		pque = db_open(TEST, type2, DB_R | DB_A);
 		LCUT_ASSERT(tc, pque != NULL);
 
-		LCUT_ASSERT(tc, pque->startAddr >= db.startAddr && pque->startAddr < db.endAddr);
-		LCUT_ASSERT(tc, pque->endAddr > db.startAddr && pque->endAddr <= db.endAddr);
+		LCUT_ASSERT(
+				tc,
+				pque->startAddr >= db.startAddr && pque->startAddr < db.endAddr);
+		LCUT_ASSERT(tc,
+				pque->endAddr > db.startAddr && pque->endAddr <= db.endAddr);
 		LCUT_INT_EQUAL(tc, 0, pque->startAddr % db.earseSize);
 		LCUT_INT_EQUAL(tc, 0, (pque->endAddr + 1) % db.earseSize);
 
@@ -49,7 +52,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 
 	db_init();	// 重新初始化
 
-	for (i = 0; i < ARRAY_LENG(type2s); ++i)
+	for(i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -71,7 +74,7 @@ void testOpen(lcut_tc_t *tc, void *data)
 	const type2_t type2s[] = {MINUS, DAY, WEEK, MONTH};
 	int i;
 
-	for (i = 0; i < ARRAY_LENG(type2s); ++i)
+	for(i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -103,7 +106,7 @@ void testSeek(lcut_tc_t *tc, void *data)
 	Db_addr addr;
 	int i;
 
-	for (i = 0; i < ARRAY_LENG(type2s); ++i)
+	for(i = 0; i < ARRAY_LENG(type2s); ++i)
 	{
 		type2 = type2s[i];
 
@@ -142,7 +145,7 @@ void testAppend(lcut_tc_t *tc, void *data)
 	pque = db_open(TEST, MINUS, DB_R | DB_A);
 	LCUT_ASSERT(tc, pque != NULL);
 
-	for (i = 0; i < 123; ++i)
+	for(i = 0; i < 123; ++i)
 	{
 		headAddr = pque->headAddr;
 
@@ -153,7 +156,7 @@ void testAppend(lcut_tc_t *tc, void *data)
 
 	db_seek(pque, 0, SEEK_SET, -1);
 
-	for (i -= 1; i > (123 - 48 * 2); --i)
+	for(i -= 1; i > (123 - 48 * 2); --i)
 	{
 		accessAddr = pque->accessAddr;
 
@@ -172,15 +175,16 @@ void testAppend(lcut_tc_t *tc, void *data)
 
 void testTimeCmp(lcut_tc_t *tc, void *data)
 {
-	union {
+	union
+	{
 		Db_time t;
 		int8_t b[sizeof(Db_time)];
-	}t1, t2;
+	} t1, t2;
 	type2_t type2;
 
 	memset(&t1, 1, sizeof(t1));
 	memset(&t2, 1, sizeof(t2));
-	for (type2 = MINUS; type2 <= YEAR; type2++)
+	for(type2 = MINUS; type2 <= YEAR; type2++)
 	{
 		memset(&t1, 1, sizeof(t1));
 		LCUT_INT_EQUAL(tc, 0, db_time_cmp(type2, &t1.t, &t2.t));
@@ -199,8 +203,7 @@ void testLocate(lcut_tc_t *tc, void *data)
 {
 	Queue *pminus_que, *pday_que;
 	Test_data d = {0};
-	Db_time t = {30, 23, 31, 44, 10, 12},
-			tt = {00, 00, 01, 44, 11, 12};
+	Db_time t = {30, 23, 31, 44, 10, 12}, tt = {00, 00, 01, 44, 11, 12};
 
 	pminus_que = db_open(TEST, MINUS, DB_R | DB_A);
 	LCUT_ASSERT(tc, pminus_que != NULL);
@@ -235,29 +238,27 @@ void testBrokenData(lcut_tc_t *tc, void *data)
 
 }
 
-
-
 void test_db(void)
 {
-    lcut_ts_t   *suite = NULL;
+	lcut_ts_t *suite = NULL;
 
-    LCUT_TEST_BEGIN("database test", NULL, NULL);
+	LCUT_TEST_BEGIN("database test", NULL, NULL);
 
-    LCUT_TS_INIT(suite, "Database - Normal Test", NULL, NULL);
-    LCUT_TC_ADD(suite, testQuesInit, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testOpen, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testSeek, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testAppend, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testTimeCmp, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testLocate, NULL, NULL, NULL);
-    LCUT_TS_ADD(suite);
+	LCUT_TS_INIT(suite, "Database - Normal Test", NULL, NULL);
+	LCUT_TC_ADD(suite, testQuesInit, NULL, NULL, NULL);
+	LCUT_TC_ADD(suite, testOpen, NULL, NULL, NULL);
+	LCUT_TC_ADD(suite, testSeek, NULL, NULL, NULL);
+	LCUT_TC_ADD(suite, testAppend, NULL, NULL, NULL);
+	LCUT_TC_ADD(suite, testTimeCmp, NULL, NULL, NULL);
+	LCUT_TC_ADD(suite, testLocate, NULL, NULL, NULL);
+	LCUT_TS_ADD(suite);
 
-    LCUT_TS_INIT(suite, "Database - Limit Test", NULL, NULL);
-    LCUT_TC_ADD(suite, testAppendToNotEmptySpace, NULL, NULL, NULL);
-    LCUT_TC_ADD(suite, testBrokenData, NULL, NULL, NULL);
-    LCUT_TS_ADD(suite);
+	LCUT_TS_INIT(suite, "Database - Limit Test", NULL, NULL);
+	LCUT_TC_ADD(suite, testAppendToNotEmptySpace, NULL, NULL, NULL);
+	LCUT_TC_ADD(suite, testBrokenData, NULL, NULL, NULL);
+	LCUT_TS_ADD(suite);
 
-    LCUT_TEST_RUN();
-    LCUT_TEST_REPORT();
-    LCUT_TEST_END();
+	LCUT_TEST_RUN();
+	LCUT_TEST_REPORT();
+	LCUT_TEST_END();
 }

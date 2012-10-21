@@ -104,10 +104,10 @@ static Queue ques[ARRAY_LENG(ctrls)];
 #endif
 
 static inline void _init(void);
-static bool _write(Db_addr addr, void *pdata, size_t len);
+static bool _write(Db_addr addr, const void *pdata, size_t len);
 static bool _read(Db_addr addr, void *pdata, size_t len);
 static bool _init_ques(void);
-static size_t _info_len(Queue *pque);
+static size_t _info_len(const Queue *pque);
 
 /** db初始化
  *
@@ -220,11 +220,11 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 
 	memcpy(pque, _get_que(pctrl), sizeof(Queue));
 	pque->flags = flags;
-	pque->dire = 0;
+	pque->dire = DIRE_STATIC;
 #else
 	pque = _get_que(pctrl);
 	pque->flags = flags;
-	pque->dire = 0;
+	pque->dire = DIRE_STATIC;
 #endif
 
 	return pque;
@@ -245,7 +245,7 @@ bool db_close(Queue *pque)
 	Queue *pmain_que = _get_que(pque->pctrl);
 	pmain_que->accessAddr = pque->accessAddr;
 	pmain_que->flags = DB_N;
-	pmain_que->dire = 0;
+	pmain_que->dire = DIRE_STATIC;
 
 	free(pque);
 #else
@@ -275,7 +275,7 @@ bool _open_by_copy(Queue *pque_buf, type1_t type1, type2_t type2, int flags, ...
 
 	memcpy(pque_buf, _get_que(pctrl), sizeof(Queue));
 	pque_buf->flags = flags;
-	pque_buf->dire = 0;
+	pque_buf->dire = DIRE_STATIC;
 
 	return true;
 }
@@ -305,7 +305,7 @@ static bool _have_child(Queue *pque)
  * @param pque
  * @return
  */
-static size_t _info_len(Queue *pque)
+static size_t _info_len(const Queue *pque)
 {
 	Ctrl *pctrl;
 	Db_Info info;
@@ -340,7 +340,7 @@ static size_t _info_len(Queue *pque)
  * @param pque
  * @return
  */
-static size_t _data_len(Queue *pque)
+size_t _data_len(const Queue *pque)
 {
 	Ctrl *pctrl;
 
@@ -356,7 +356,7 @@ static size_t _data_len(Queue *pque)
  * @param pque
  * @return
  */
-static size_t _info_data_len(Queue *pque)
+static size_t _info_data_len(const Queue *pque)
 {
 	Ctrl *pctrl;
 
@@ -375,9 +375,9 @@ static size_t _info_data_len(Queue *pque)
  * @param data_len
  * @return
  */
-static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t data_len)
+static uint8_t _calc_checksum(Queue *pque, const Db_Info *pinfo, const void *pdata, size_t data_len)
 {
-	uint8_t *p;
+	const uint8_t *p;
 	uint8_t checksum = 0x55;
 	int i;
 	size_t info_len;
@@ -408,7 +408,7 @@ static uint8_t _calc_checksum(Queue *pque, Db_Info *pinfo, void *pdata, size_t d
  * @param dire
  * @return
  */
-static Db_addr _get_next_addr(Queue *pque, Db_addr curAddr, int dire)
+static Db_addr _get_next_addr(const Queue *pque, Db_addr curAddr, int dire)
 {
 	Db_addr addr;
 	size_t 	len;
@@ -446,7 +446,7 @@ static Db_addr _get_next_addr(Queue *pque, Db_addr curAddr, int dire)
  * @param pque
  * @return
  */
-static Db_child _get_child(Queue *pque)
+static Db_child _get_child(const Queue *pque)
 {
 	Db_child child;
 	Ctrl *pctrl;
@@ -481,7 +481,7 @@ static Db_child _get_child(Queue *pque)
  * @todo	验证写入的正确性
  * @todo	处理数据被意外损坏的情况
  */
-bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime)
+bool db_append(Queue *pque, const void *pdata, size_t data_len, const Db_time *ptime)
 {
 	Db_Info info;
 	bool stat;
@@ -749,7 +749,7 @@ static type2_t _get_parent_type2(Ctrl *pctrl)
  * @param type2
  * @return
  */
-int db_time_cmp(type2_t type2, Db_time *pt1, Db_time *pt2)
+int db_time_cmp(type2_t type2, const Db_time *pt1, const Db_time *pt2)
 {
 	union {
 		int64_t v;
@@ -818,9 +818,9 @@ int db_time_cmp(type2_t type2, Db_time *pt1, Db_time *pt2)
  * @param plocate_time
  * @param deep
  * @return
- * @todo	返回实现定位到数据类型
+ * @todo	从给出的指定的父类数据开始定位
  */
-type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep)
+type2_t db_locate(Queue *pque, const Db_time *plocate_time, int deep)
 {
 	Ctrl *pctrl = NULL;
 	Db_time rtime;
@@ -967,7 +967,7 @@ static bool _init_ques(void)
 		pque->headAddr = _find_queue_head(pque);
 		pque->accessAddr = pque->headAddr;
 		pque->flags = DB_N;
-		pque->dire = 0;
+		pque->dire = DIRE_STATIC;
 
 		assert(pque->endAddr <= db.endAddr);
 		if(pque->endAddr > db.endAddr)
@@ -997,11 +997,11 @@ static inline void _init(void)
  * @param src
  * @param len
  */
-static void _encrypt(void *dst, void *src, size_t len)
+static void _encrypt(void *dst, const void *src, size_t len)
 {
 	int i;
 	uint8_t *pd = dst;
-	uint8_t *ps = src;
+	const uint8_t *ps = src;
 
 	assert(dst != NULL);
 	assert(src != NULL);
@@ -1028,7 +1028,7 @@ static inline void _decrypt(void *dst, void *src, size_t len)
  * @param len
  * @return
  */
-static bool _write(Db_addr addr, void *pdata, size_t len)
+static bool _write(Db_addr addr, const void *pdata, size_t len)
 {
 	assert(pdata != NULL);
 

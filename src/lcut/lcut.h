@@ -56,7 +56,7 @@ extern "C"
 \t\t By Tony Bai\n\
 *********************************************************\n"
 #define SUITE_TIP_FMT "\nSuite <%s>: \n"
-#define SUCCESS_TIP_FMT "\tCase '%s': Passed\n"
+#define SUCCESS_TIP_FMT "\tCase %s: Passed\n"
 #if 0
 #	define FAILURE_TIP_FMT "\t\t\033[31mCase '%s': Failure occur in %s, %d line in file %s, %s\033[0m\n"
 

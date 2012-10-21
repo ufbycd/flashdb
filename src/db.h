@@ -68,9 +68,9 @@ typedef enum _type2{
 #define DB_W	(1u << 1)	/** 写 */
 #define DB_A	(1u << 2)	/** 追加 */
 
-#define DIRE_CUR	0 /* 访问后指针不变 */
-#define DIRE_BACK	-1 /* 访问后指针往后移动 */
-#define DIRE_FOR	1 /* 访问后指针往前移动 */
+#define DIRE_STATIC	0 /* 访问后指针不变 */
+#define DIRE_BACKWARD	-1 /* 访问后指针往后移动 */
+#define DIRE_FORWARD	1 /* 访问后指针往前移动 */
 
 /* The possibilities for the third argument to `fseek'.
    These values should not be changed.  */
@@ -87,13 +87,13 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...);
 bool db_close(Queue *pque);
 
 bool db_seek(Queue *pque, int ndata, int whence, int dire);
-type2_t db_locate(Queue *pque, Db_time *plocate_time, int deep);
+type2_t db_locate(Queue *pque, const Db_time *plocate_time, int deep);
 
 bool db_read(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
-bool db_append(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
+bool db_append(Queue *pque, const void *pdata, size_t data_len, const Db_time *ptime);
 //bool db_write(Queue *pque, void *pdata, size_t data_len, Db_time *ptime);
 
-int db_time_cmp(type2_t type2, Db_time *pt1, Db_time *pt2);
+int db_time_cmp(type2_t type2, const Db_time *pt1, const Db_time *pt2);
 bool db_erase(Queue *pque);
 bool db_ereae_all(void);
 

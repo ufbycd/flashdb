@@ -24,7 +24,7 @@ typedef struct _Flash{
 extern const flash_t flash;
 
 void flash_init(void);
-bool flash_write(uint32_t addr, void * buf, uint32_t len);
+bool flash_write(uint32_t addr, const void * buf, uint32_t len);
 bool flash_read(uint32_t addr, void * buf, uint32_t len);
 
 #endif /* FLASH_H_ */

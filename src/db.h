@@ -67,6 +67,7 @@ typedef enum _type2{
 #define DB_R	(1u)			/** 读 */
 #define DB_W	(1u << 1)	/** 写 */
 #define DB_A	(1u << 2)	/** 追加 */
+#define DB_IGNORE_CHILD (1u << 3) /* 追加数据时忽略child数据的处理 */
 
 #define DIRE_STATIC	0 /* 访问后指针不变 */
 #define DIRE_BACKWARD	-1 /* 访问后指针往后移动 */

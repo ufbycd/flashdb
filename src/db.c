@@ -35,6 +35,8 @@
 #define DATA_AVAIL DECRYPT(0xfe)
 #define DATA_NAN   DECRYPT(0xff)
 
+#define NULL_ADDRESS 0x00
+
 #define YEAR_NUM 	2
 #define MONTH_NUM 14
 #define WEEK_NUM	7
@@ -456,16 +458,16 @@ static Db_child _get_child(const Queue *pque)
 	assert(pque != NULL);
 
 	pctrl = pque->pctrl;
-	if(pctrl->child_type2 != NONE2)
+	if((pctrl->child_type2 == NONE2) || (pque->flags & DB_IGNORE_CHILD))
+	{
+		child.endAddr = NULL_ADDRESS;
+	}
+	else
 	{
 		res = _open_by_copy(&child_que, pctrl->type1, pctrl->child_type2, DB_R);
 		assert(res == true);
 
 		child.endAddr = child_que.headAddr;
-	}
-	else
-	{
-		child.endAddr = 0x00;
 	}
 
 	return child;

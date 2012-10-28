@@ -225,6 +225,7 @@ void testLocate(lcut_tc_t *tc, void *data)
 	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, MINUS));
 	LCUT_INT_EQUAL(tc, DAY, db_locate(pday_que, &t, DAY));
 	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, DAY));
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, WEEK));
 
 	db_close(pminus_que);
 	db_close(pday_que);

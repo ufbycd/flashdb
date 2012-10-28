@@ -856,20 +856,24 @@ type2_t db_locate(Queue *pque, const Db_time *plocate_time, type2_t begin_type2)
 		type2_t parent_type2;
 
 		parent_type2 = _get_parent_type2(pctrl, begin_type2);
-		if(!_open_by_copy(&parent_que, pctrl->type1, parent_type2, DB_R))
-			return NONE2;
+		do
+		{
+			if(!_open_by_copy(&parent_que, pctrl->type1, parent_type2, DB_R))
+				break;
 
-		if(db_locate(&parent_que, plocate_time, begin_type2) != parent_type2)
-			return NONE2;
+			if(db_locate(&parent_que, plocate_time, begin_type2) != parent_type2)
+				break;
 
-		if(!_read_info(&parent_que, &info))
-			return NONE2;
+			if(!_read_info(&parent_que, &info))
+				break;
 
-		pque->accessAddr = info.child.endAddr;
-		pque->dire = -1;
-		located_type2 = parent_type2;
+			pque->accessAddr = info.child.endAddr;
+			pque->dire = -1;
+			located_type2 = parent_type2;
+		}while(0);
 	}
-	else
+
+	if(located_type2 == NONE2)
 	{
 		db_seek(pque, 0, SEEK_SET, -1);
 	}

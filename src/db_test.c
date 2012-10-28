@@ -41,6 +41,8 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 				pque->endAddr > db.startAddr && pque->endAddr <= db.endAddr);
 		LCUT_INT_EQUAL(tc, 0, pque->startAddr % db.earseSize);
 		LCUT_INT_EQUAL(tc, 0, (pque->endAddr + 1) % db.earseSize);
+		LCUT_ASSERT(tc, pque->headAddr >= pque->startAddr);
+		LCUT_ASSERT(tc, pque->headAddr < pque->endAddr);
 
 		LCUT_ASSERT(tc, pque->pctrl != NULL);
 
@@ -213,16 +215,16 @@ void testLocate(lcut_tc_t *tc, void *data)
 	LCUT_ASSERT(tc, db_erase(pminus_que));
 	LCUT_ASSERT(tc, db_erase(pday_que));
 
-	LCUT_INT_EQUAL(tc, NONE2, db_locate(pminus_que, &t, 0));
-	LCUT_INT_EQUAL(tc, NONE2, db_locate(pday_que, &t, 0));
+	LCUT_INT_EQUAL(tc, NONE2, db_locate(pminus_que, &t, MINUS));
+	LCUT_INT_EQUAL(tc, NONE2, db_locate(pday_que, &t, DAY));
 
 	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &t));
 	LCUT_ASSERT(tc, db_append(pday_que, &d, sizeof(d), &t));
 	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &tt));
 
-	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 0));
-	LCUT_INT_EQUAL(tc, DAY, db_locate(pday_que, &t, 0));
-	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, 1));
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, MINUS));
+	LCUT_INT_EQUAL(tc, DAY, db_locate(pday_que, &t, DAY));
+	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, DAY));
 
 	db_close(pminus_que);
 	db_close(pday_que);

@@ -3,7 +3,6 @@
  *
  *  Created on: 2012-9-8
  *      Author: chenss
- *      @todo 引入单元测试框架
  */
 
 #include "db.h"
@@ -78,21 +77,21 @@ typedef const struct
 	size_t data_len;
 	int max_num;
 //	Queue *pque;
-	int		index;
+//	int		index;
 } Ctrl;
 
 static Ctrl ctrls[] = {
-		{TEST, MINUS, 	NONE2,	sizeof(Test_data), 48 * 2, 	0},
-		{TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM,	1},
-		{TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM,	2},
-		{TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM,	3},
-		{TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM,	4},
+		{TEST, MINUS, 	NONE2,	sizeof(Test_data), 48 * 2},
+		{TEST, DAY, 	MINUS,	sizeof(Test_data), DAY_NUM},
+		{TEST, WEEK, 	DAY,	sizeof(Test_data), WEEK_NUM},
+		{TEST, MONTH, 	DAY,	sizeof(Test_data), MONTH_NUM},
+		{TEST, YEAR, 	MONTH,	sizeof(Test_data), YEAR_NUM},
 
-		{ELEC, MINUS,	NONE2,	sizeof(Elec_data), MINUS_NUM, 5},
-		{ELEC, DAY,		MINUS,	sizeof(Elec_data), DAY_NUM, 	6},
-		{ELEC, WEEK,	DAY,	sizeof(Elec_data), WEEK_NUM, 	7},
-		{ELEC, MONTH,	DAY,	sizeof(Elec_data), MONTH_NUM, 8},
-		{ELEC, YEAR,	MONTH,	sizeof(Elec_data), YEAR_NUM,  9},
+		{ELEC, MINUS,	NONE2,	sizeof(Elec_data), MINUS_NUM},
+		{ELEC, DAY,		MINUS,	sizeof(Elec_data), DAY_NUM},
+		{ELEC, WEEK,	DAY,	sizeof(Elec_data), WEEK_NUM},
+		{ELEC, MONTH,	DAY,	sizeof(Elec_data), MONTH_NUM},
+		{ELEC, YEAR,	MONTH,	sizeof(Elec_data), YEAR_NUM},
 
 };
 
@@ -179,11 +178,11 @@ static Ctrl *_get_ctrl(type1_t type1, type2_t type2)
  */
 static Queue *_get_que(Ctrl *pctrl)
 {
+	int i;
+
 	assert(pctrl != NULL);
 
 #if 0
-	int i;
-
 	for(i = 0; i < ARRAY_LENG(ctrls); i++)
 	{
 		if(pctrl == &ctrls[i])
@@ -191,11 +190,15 @@ static Queue *_get_que(Ctrl *pctrl)
 			return &ques[i];
 		}
 	}
+
 	return NULL;
 #else
-	return &ques[pctrl->index];
-#endif
+	i = ((void *)pctrl - (void *)&ctrls[0]) / sizeof(Ctrl);
+	if(pctrl != &ctrls[i])
+		return NULL;
 
+	return &ques[i];
+#endif
 }
 
 /** 打开队列
@@ -216,7 +219,7 @@ Queue *db_open(type1_t type1, type2_t type2, int flags, ...)
 		return NULL;
 
 #if MULTIPLE_OPEN
-	pque = (Queue *)malloc(sizeof(Queue));
+	pque = malloc(sizeof(Queue));
 	if(pque == NULL )
 		return NULL;
 
@@ -728,8 +731,9 @@ static bool _have_parent(Ctrl *pctrl)
  * @param pctrl
  * @return
  */
-static type2_t _get_parent_type2(Ctrl *pctrl)
+static type2_t _get_parent_type2(Ctrl *pctrl, type2_t final_type2)
 {
+	type2_t parent_type2 = NONE2;
 	int i;
 
 	for (i = 0; i < ARRAY_LENG(ctrls); ++i)
@@ -738,10 +742,16 @@ static type2_t _get_parent_type2(Ctrl *pctrl)
 			continue;
 
 		if(ctrls[i].child_type2 == pctrl->type2)
-			return ctrls[i].type2;
+			parent_type2 = ctrls[i].type2;
+
+		if(parent_type2 == final_type2)
+		{
+			parent_type2 = final_type2;
+			break;
+		}
 	}
 
-	return NONE2;
+	return parent_type2;
 }
 
 /** 判断给定数据类型上的两时间是否相同
@@ -822,7 +832,7 @@ int db_time_cmp(type2_t type2, const Db_time *pt1, const Db_time *pt2)
  * @return
  * @todo	从给出的指定的父类数据开始定位
  */
-type2_t db_locate(Queue *pque, const Db_time *plocate_time, int deep)
+type2_t db_locate(Queue *pque, const Db_time *plocate_time, type2_t begin_type2)
 {
 	Ctrl *pctrl = NULL;
 	Db_time rtime;
@@ -839,21 +849,21 @@ type2_t db_locate(Queue *pque, const Db_time *plocate_time, int deep)
 	curAddr = pque->accessAddr;
 	dire = pque->dire;
 
-	if(deep && _have_parent(pctrl))
+	if((begin_type2 != pctrl->type2) && _have_parent(pctrl))
 	{
 		Queue parent_que;
 		Db_Info info;
 		type2_t parent_type2;
 
-		parent_type2 = _get_parent_type2(pctrl);
+		parent_type2 = _get_parent_type2(pctrl, begin_type2);
 		if(!_open_by_copy(&parent_que, pctrl->type1, parent_type2, DB_R))
-			return false;
+			return NONE2;
 
-		if(db_locate(&parent_que, plocate_time, deep - 1) != parent_type2)
-			return false;
+		if(db_locate(&parent_que, plocate_time, begin_type2) != parent_type2)
+			return NONE2;
 
 		if(!_read_info(&parent_que, &info))
-			return false;
+			return NONE2;
 
 		pque->accessAddr = info.child.endAddr;
 		pque->dire = -1;
@@ -938,6 +948,7 @@ static Db_addr _find_queue_head(Queue *pque)
  */
 static bool _init_ques(void)
 {
+	Ctrl *pctrl;
 	Db_addr addr, left;
 	Queue *pque;
 	size_t info_datas_len;	// 所有 info信息 + 待存储数据 长度之和
@@ -956,11 +967,13 @@ static bool _init_ques(void)
 
 	for(i = 0; i < ARRAY_LENG(ctrls); i++)
 	{
-		pque = &ques[i];
-		pque->pctrl = &ctrls[i];
+		pctrl = &ctrls[i];
+
+		pque = _get_que(pctrl);
+		pque->pctrl = pctrl;
 
 		pque->startAddr = addr;
-		info_datas_len = _info_data_len(pque) * ctrls[i].max_num;
+		info_datas_len = _info_data_len(pque) * pctrl->max_num;
 		que_len = ( 2 + info_datas_len / db.earseSize) * db.earseSize;	// 确保队列的长度为擦除大小的整数倍
 		pque->endAddr = pque->startAddr + que_len - 1;
 

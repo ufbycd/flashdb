@@ -49,7 +49,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		headAddrs[i] = pque->headAddr;
 		LCUT_ASSERT(tc, db_append(pque, &d, sizeof(d), &t));
 
-		LCUT_ASSERT(tc, db_close(pque));
+		 db_close(pque);
 	}
 
 	db_init();	// 重新初始化
@@ -65,7 +65,7 @@ void testQuesInit(lcut_tc_t *tc, void *data)
 		db_seek(pque, -1, SEEK_SET, 0);
 		LCUT_ASSERT(tc, pque->accessAddr == headAddrs[i]);
 
-		LCUT_ASSERT(tc, db_close(pque));
+		 db_close(pque);
 	}
 }
 
@@ -83,17 +83,17 @@ void testOpen(lcut_tc_t *tc, void *data)
 		pque = db_open(TEST, type2, DB_R);
 		LCUT_ASSERT(tc, pque != NULL);
 		LCUT_INT_EQUAL(tc, DB_R, pque->flags);
-		LCUT_ASSERT(tc, db_close(pque));
+		 db_close(pque);
 
 		pque = db_open(TEST, type2, DB_R | DB_W);
 		LCUT_ASSERT(tc, pque != NULL);
 		LCUT_INT_EQUAL(tc, DB_R | DB_W, pque->flags);
-		LCUT_ASSERT(tc, db_close(pque));
+		db_close(pque);
 
 		pque = db_open(TEST, type2, DB_R | DB_A);
 		LCUT_ASSERT(tc, pque != NULL);
 		LCUT_INT_EQUAL(tc, DB_R | DB_A, pque->flags);
-		LCUT_ASSERT(tc, db_close(pque));
+		db_close(pque);
 	}
 
 	pque = db_open(NONE1, MINUS, DB_R);
@@ -131,7 +131,7 @@ void testSeek(lcut_tc_t *tc, void *data)
 		db_seek(pque, 0, SEEK_CUR, 0);
 		LCUT_ASSERT(tc, pque->accessAddr == addr);
 
-		LCUT_ASSERT(tc, db_close(pque));
+		db_close(pque);
 	}
 
 }
@@ -172,7 +172,7 @@ void testAppend(lcut_tc_t *tc, void *data)
 		LCUT_INT_EQUAL(tc, 0, memcmp(&rt, &t, sizeof(rt)));
 	}
 
-	LCUT_ASSERT(tc, db_close(pque));
+	db_close(pque);
 }
 
 void testTimeCmp(lcut_tc_t *tc, void *data)
@@ -215,17 +215,18 @@ void testLocate(lcut_tc_t *tc, void *data)
 	LCUT_ASSERT(tc, db_erase(pminus_que));
 	LCUT_ASSERT(tc, db_erase(pday_que));
 
-	LCUT_INT_EQUAL(tc, NONE2, db_locate(pminus_que, &t, MINUS));
-	LCUT_INT_EQUAL(tc, NONE2, db_locate(pday_que, &t, DAY));
+	LCUT_INT_EQUAL(tc, -1, db_locate(pminus_que, &t, MINUS));
+	LCUT_INT_EQUAL(tc, -1, db_locate(pday_que, &t, DAY));
 
 	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &t));
 	LCUT_ASSERT(tc, db_append(pday_que, &d, sizeof(d), &t));
 	LCUT_ASSERT(tc, db_append(pminus_que, &d, sizeof(d), &tt));
 
-	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, MINUS));
-	LCUT_INT_EQUAL(tc, DAY, db_locate(pday_que, &t, DAY));
-	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, DAY));
-	LCUT_INT_EQUAL(tc, MINUS, db_locate(pminus_que, &t, WEEK));
+	LCUT_INT_EQUAL(tc, 1, db_locate(pminus_que, &t, MINUS));
+	LCUT_INT_EQUAL(tc, 1, db_locate(pday_que, &t, DAY));
+	LCUT_INT_EQUAL(tc, 1, db_locate(pminus_que, &t, DAY));
+	LCUT_INT_EQUAL(tc, -1, db_locate(pminus_que, &t, WEEK));
+	LCUT_INT_EQUAL(tc, -1, db_locate(pminus_que, &t, YEAR));
 
 	db_close(pminus_que);
 	db_close(pday_que);
